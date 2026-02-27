@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsArray, IsNumber, IsEnum, IsUrl, IsInt } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsArray, IsNumber, IsEnum, IsInt } from 'class-validator';
 
 export class CreatePostDto {
     // --- Autor (Opcional para pruebas) ---
@@ -11,7 +11,7 @@ export class CreatePostDto {
     @IsOptional()
     content?: string;
 
-    @IsUrl()
+    @IsString()
     @IsOptional()
     mediaUrl?: string; // URL de imagen/video en Firebase
 

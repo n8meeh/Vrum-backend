@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateVehicleDto {
     @IsNumber()
@@ -28,4 +28,16 @@ export class CreateVehicleDto {
     @IsString()
     @IsOptional()
     photoUrl?: string;
+
+    @IsOptional()
+    @IsIn(['gasoline', 'diesel', 'electric', 'hybrid', 'gas', 'other'])
+    fuelType?: string;
+
+    @IsOptional()
+    @IsIn(['manual', 'automatic'])
+    transmission?: string;
+
+    @IsString()
+    @IsOptional()
+    engineSize?: string;
 }

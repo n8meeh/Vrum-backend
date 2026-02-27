@@ -36,6 +36,25 @@ export class Vehicle {
     @Column({ name: 'photo_url', nullable: true })
     photoUrl: string;
 
+    @Column({
+        name: 'fuel_type',
+        type: 'enum',
+        enum: ['gasoline', 'diesel', 'electric', 'hybrid', 'gas', 'other'],
+        default: 'gasoline',
+    })
+    fuelType: string;
+
+    @Column({
+        name: 'transmission',
+        type: 'enum',
+        enum: ['manual', 'automatic'],
+        default: 'manual',
+    })
+    transmission: string;
+
+    @Column({ name: 'engine_size', length: 20, nullable: true })
+    engineSize: string;
+
     @Column({ name: 'last_mileage', default: 0 })
     lastMileage: number;
 

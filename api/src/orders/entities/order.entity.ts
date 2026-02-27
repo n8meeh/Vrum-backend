@@ -1,8 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, OneToOne } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Provider } from '../../providers/entities/provider.entity'; // Asegura la ruta
 import { Vehicle } from '../../vehicles/entities/vehicle.entity';   // Asegura la ruta
 import { Post } from '../../posts/entities/post.entity';
+import { Review } from '../../reviews/entities/review.entity';
 
 @Entity('orders')
 export class Order {
@@ -66,5 +67,6 @@ export class Order {
     @Column({ name: 'is_proposal', default: false })
     isProposal: boolean;
 
-    // ...
+    @OneToOne(() => Review, (review) => review.order)
+    review: Review;
 }

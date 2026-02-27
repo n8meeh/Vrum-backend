@@ -1,16 +1,16 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan, Not, IsNull } from 'typeorm'; // Agregué Not e IsNull por si acaso
-import { Order } from './entities/order.entity';
+import { MoreThan, Repository } from 'typeorm'; // Agregué Not e IsNull por si acaso
+import { Negotiation } from '../negotiations/entities/negotiation.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import { PostsService } from '../posts/posts.service';
+import { Provider } from '../providers/entities/provider.entity';
+import { VehicleMileageLog } from '../vehicles/entities/vehicle-mileage-log.entity';
+import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
-import { PostsService } from '../posts/posts.service';
-import { Negotiation } from '../negotiations/entities/negotiation.entity';
-import { Provider } from '../providers/entities/provider.entity';
-import { Vehicle } from '../vehicles/entities/vehicle.entity';
-import { VehicleMileageLog } from '../vehicles/entities/vehicle-mileage-log.entity';
-import { NotificationsService } from '../notifications/notifications.service';
+import { Order } from './entities/order.entity';
 
 @Injectable()
 export class OrdersService {
@@ -193,7 +193,7 @@ export class OrdersService {
           throw new ForbiddenException('Solo el proveedor puede aceptar esta orden');
         }
       }
-      
+
       // Validar transición: accepted -> completed (cliente o proveedor)
       else if (currentStatus === 'accepted' && newStatus === 'completed') {
         // Ambas partes pueden completar la orden
@@ -223,7 +223,7 @@ export class OrdersService {
           }
         }
       }
-      
+
       // Validar transición: cualquier estado -> cancelled
       else if (newStatus === 'cancelled') {
         // Ambas partes pueden cancelar
@@ -231,7 +231,7 @@ export class OrdersService {
           throw new ForbiddenException('No tienes permiso para cancelar esta orden');
         }
       }
-      
+
       // Transición no válida
       else if (currentStatus !== newStatus) {
         throw new BadRequestException(
@@ -268,6 +268,7 @@ export class OrdersService {
         'vehicle.model',
         'vehicle.model.brand',
         'post',
+        'review',
       ],
       select: {
         id: true,
@@ -308,6 +309,9 @@ export class OrdersService {
           plate: true,
           year: true,
           lastMileage: true,
+          fuelType: true,
+          transmission: true,
+          engineSize: true,
           model: {
             id: true,
             name: true,
@@ -316,7 +320,8 @@ export class OrdersService {
               name: true
             }
           }
-        }
+        },
+        review: true
       }
     });
   }

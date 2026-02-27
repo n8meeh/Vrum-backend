@@ -1,11 +1,11 @@
-import { Controller, Post, Body, Get, Param, UseGuards, Request, Query, Patch, Delete } from '@nestjs/common';
-import { PostsService } from './posts.service';
-import { CreatePostDto } from './dto/create-post.dto';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { CommentsService } from '../comments/comments.service';
+import { CreatePostDto } from './dto/create-post.dto';
 import { GetFeedDto } from './dto/get-feed.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
-import { CommentsService } from '../comments/comments.service';
-import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { PostsService } from './posts.service';
 @Controller('posts')
 export class PostsController {
   constructor(private readonly postsService: PostsService,
@@ -58,14 +58,18 @@ export class PostsController {
 
 
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('user/:userId') // GET /posts/user/5
-  getUserPosts(@Param('userId') userId: string) {
-    return this.postsService.findAllByUser(+userId);
+  getUserPosts(@Request() req, @Param('userId') userId: string) {
+    const viewerId = req.user?.userId;
+    return this.postsService.findAllByUser(+userId, viewerId);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('provider/:providerId') // GET /posts/provider/5
-  getProviderPosts(@Param('providerId') providerId: string) {
-    return this.postsService.findAllByProvider(+providerId);
+  getProviderPosts(@Request() req, @Param('providerId') providerId: string) {
+    const viewerId = req.user?.userId;
+    return this.postsService.findAllByProvider(+providerId, viewerId);
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -96,7 +100,7 @@ export class PostsController {
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   findOne(@Request() req, @Param('id') id: string) {
-    
+
     // Pasamos el userId si el usuario está autenticado, sino undefined
     const userId = req.user?.userId;
     return this.postsService.findOne(+id, userId);

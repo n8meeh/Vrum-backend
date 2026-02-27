@@ -1,17 +1,17 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { CreatePostDto } from './dto/create-post.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, MoreThan } from 'typeorm';
-import { Post } from './entities/post.entity';
-import { PostLike } from './entities/post-like.entity';
-import { PollVote } from './entities/poll-vote.entity';
-import { Tag } from './entities/tag.entity';
+import { In, MoreThan, Repository } from 'typeorm';
+import { Provider } from '../providers/entities/provider.entity';
+import { UserBlock } from '../users/entities/user-block.entity';
+import { UserFollow } from '../users/entities/user-follow.entity';
+import { User } from '../users/entities/user.entity'; // Asegúrate que la ruta sea correcta
+import { CreatePostDto } from './dto/create-post.dto';
 import { GetFeedDto } from './dto/get-feed.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
-import { UserFollow } from '../users/entities/user-follow.entity';
-import { UserBlock } from '../users/entities/user-block.entity';
-import { Provider } from '../providers/entities/provider.entity';
-import { User } from '../users/entities/user.entity'; // Asegúrate que la ruta sea correcta
+import { PollVote } from './entities/poll-vote.entity';
+import { PostLike } from './entities/post-like.entity';
+import { Post } from './entities/post.entity';
+import { Tag } from './entities/tag.entity';
 
 @Injectable()
 export class PostsService {
@@ -50,24 +50,115 @@ export class PostsService {
     return { message: 'Post eliminado correctamente' };
   }
 
-  async findAllByUser(userId: number) {
-    const posts = await this.postsRepository.find({
-      where: { authorId: userId, status: 'active' },
-      order: { createdAt: 'DESC' },
-      relations: ['vehicle', 'tags']
+  async findAllByUser(authorId: number, viewerId?: number) {
+    const queryBuilder = this.postsRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('post.vehicle', 'vehicle')
+      .leftJoinAndSelect('vehicle.model', 'model')
+      .leftJoinAndSelect('model.brand', 'brand')
+      .leftJoinAndSelect('post.tags', 'tags')
+      .where('post.authorId = :authorId', { authorId })
+      .andWhere('post.status = :status', { status: 'active' })
+      .orderBy('post.createdAt', 'DESC');
+
+    // Cargar likesCount y commentsCount
+    queryBuilder.loadRelationCountAndMap('post.likesCount', 'post.likes');
+    queryBuilder.loadRelationCountAndMap('post.commentsCount', 'post.comments');
+
+    // Si hay un espectador logueado, agregamos isLiked
+    if (viewerId) {
+      queryBuilder.addSelect(
+        subQuery => {
+          return subQuery
+            .select('COUNT(pl.user_id)', 'count')
+            .from('post_likes', 'pl')
+            .where('pl.post_id = post.id AND pl.user_id = :viewerId');
+        },
+        'post_isLikedByUser'
+      );
+      queryBuilder.setParameter('viewerId', viewerId);
+    }
+
+    const posts = await queryBuilder.getMany();
+
+    // Mapear el resultado para incluir isLiked como booleano
+    const mappedPosts = posts.map(post => {
+      const rawResult = (post as any).post_isLikedByUser;
+      return {
+        ...post,
+        isLiked: viewerId ? (rawResult > 0 || false) : false,
+        likesCount: (post as any).likesCount || 0,
+        commentsCount: (post as any).commentsCount || 0
+      };
     });
-    const enrichedPosts = await this.enrichWithPollCounts(posts);
-    return enrichedPosts;
+
+    const enrichedPosts = await this.enrichWithPollCounts(mappedPosts);
+
+    if (viewerId) {
+      return this.enrichWithUserState(enrichedPosts, viewerId);
+    }
+
+    return enrichedPosts.map(post => ({
+      ...post,
+      userVotedOption: null
+    }));
   }
 
-  async findAllByProvider(providerId: number) {
-    const posts = await this.postsRepository.find({
-      where: { providerId: providerId, status: 'active' },
-      order: { createdAt: 'DESC' },
-      relations: ['author', 'vehicle', 'tags', 'provider']
+  async findAllByProvider(providerId: number, viewerId?: number) {
+    const queryBuilder = this.postsRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('post.vehicle', 'vehicle')
+      .leftJoinAndSelect('vehicle.model', 'model')
+      .leftJoinAndSelect('model.brand', 'brand')
+      .leftJoinAndSelect('post.tags', 'tags')
+      .leftJoinAndSelect('post.provider', 'provider')
+      .where('post.providerId = :providerId', { providerId })
+      .andWhere('post.status = :status', { status: 'active' })
+      .orderBy('post.createdAt', 'DESC');
+
+    // Cargar likesCount y commentsCount
+    queryBuilder.loadRelationCountAndMap('post.likesCount', 'post.likes');
+    queryBuilder.loadRelationCountAndMap('post.commentsCount', 'post.comments');
+
+    // Si hay un espectador logueado, agregamos isLiked
+    if (viewerId) {
+      queryBuilder.addSelect(
+        subQuery => {
+          return subQuery
+            .select('COUNT(pl.user_id)', 'count')
+            .from('post_likes', 'pl')
+            .where('pl.post_id = post.id AND pl.user_id = :viewerId');
+        },
+        'post_isLikedByUser'
+      );
+      queryBuilder.setParameter('viewerId', viewerId);
+    }
+
+    const posts = await queryBuilder.getMany();
+
+    // Mapear el resultado para incluir isLiked como booleano
+    const mappedPosts = posts.map(post => {
+      const rawResult = (post as any).post_isLikedByUser;
+      return {
+        ...post,
+        isLiked: viewerId ? (rawResult > 0 || false) : false,
+        likesCount: (post as any).likesCount || 0,
+        commentsCount: (post as any).commentsCount || 0
+      };
     });
-    const enrichedPosts = await this.enrichWithPollCounts(posts);
-    return enrichedPosts;
+
+    const enrichedPosts = await this.enrichWithPollCounts(mappedPosts);
+
+    if (viewerId) {
+      return this.enrichWithUserState(enrichedPosts, viewerId);
+    }
+
+    return enrichedPosts.map(post => ({
+      ...post,
+      userVotedOption: null
+    }));
   }
 
   async create(userId: number, createPostDto: CreatePostDto) {
@@ -169,10 +260,10 @@ export class PostsService {
         return { ...post };
       }
 
-      const options = Array.isArray(post.pollOptions) 
-        ? post.pollOptions 
+      const options = Array.isArray(post.pollOptions)
+        ? post.pollOptions
         : JSON.parse(post.pollOptions);
-      
+
       const pollCounts = options.map((_: any, index: number) => {
         return votesMap[post.id]?.[index] || 0;
       });
@@ -198,9 +289,9 @@ export class PostsService {
 
     // Consulta para verificar likes del usuario
     const userLikes = await this.postLikesRepository.find({
-      where: { 
-        postId: In(postIds), 
-        userId 
+      where: {
+        postId: In(postIds),
+        userId
       },
       select: ['postId']
     });
@@ -208,9 +299,9 @@ export class PostsService {
 
     // Consulta para verificar votos del usuario en encuestas
     const userVotes = await this.pollVotesRepository.find({
-      where: { 
-        postId: In(postIds), 
-        userId 
+      where: {
+        postId: In(postIds),
+        userId
       },
       select: ['postId', 'optionIndex']
     });
@@ -256,7 +347,7 @@ export class PostsService {
         await this.pollVotesRepository.delete({ postId, userId });
         status = 'unvoted';
         userVotedOption = null;
-      } 
+      }
       // Caso B: Cambio de opción -> ACTUALIZAR
       else {
         existingVote.optionIndex = optionIndex;
@@ -338,6 +429,8 @@ export class PostsService {
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.vehicle', 'vehicle')
+      .leftJoinAndSelect('vehicle.model', 'model')
+      .leftJoinAndSelect('model.brand', 'brand')
       .leftJoinAndSelect('post.tags', 'tags')
       .where('post.status = :status', { status: 'active' })
       .orderBy('post.createdAt', 'DESC');
@@ -375,12 +468,12 @@ export class PostsService {
     });
 
     const enrichedPosts = await this.enrichWithPollCounts(mappedPosts);
-    
+
     // Agregar userVotedOption si hay usuario autenticado
     if (userId) {
       return this.enrichWithUserState(enrichedPosts, userId);
     }
-    
+
     return enrichedPosts.map(post => ({
       ...post,
       userVotedOption: null
@@ -390,7 +483,7 @@ export class PostsService {
   async findOne(id: number, userId?: number) {
     const post = await this.postsRepository.findOne({
       where: { id },
-      relations: ['author', 'vehicle', 'tags']
+      relations: ['author', 'vehicle', 'vehicle.model', 'vehicle.model.brand', 'tags']
     });
     if (!post) return null;
 
@@ -449,6 +542,8 @@ export class PostsService {
     const query = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.vehicle', 'vehicle')
+      .leftJoinAndSelect('vehicle.model', 'model')
+      .leftJoinAndSelect('model.brand', 'brand')
       .leftJoinAndSelect('post.tags', 'tags')
       .where('post.status = :status', { status: 'active' });
 
@@ -506,11 +601,11 @@ export class PostsService {
 
     // Estrategia 1: NEARBY (Cercanía) - Requiere lat/lng
     if (filter === 'nearby' && lat && lng) {
-      
+
       // Fórmula Haversine para calcular distancia en km
       // Distancia = 6371 * acos(cos(lat1) * cos(lat2) * cos(lng2 - lng1) + sin(lat1) * sin(lat2))
       const distanceFormula = `(6371 * acos(cos(radians(:lat)) * cos(radians(post.lat)) * cos(radians(post.lng) - radians(:lng)) + sin(radians(:lat)) * sin(radians(post.lat))))`;
-      
+
       query.addSelect(distanceFormula, 'distance')
         // CRÍTICO: Solo mostrar posts con coordenadas válidas
         .andWhere('post.lat IS NOT NULL')
@@ -567,7 +662,7 @@ export class PostsService {
     let result = entities.map(entity => {
       const rawResult = raw.find(r => r.post_id === entity.id);
       const isLiked = userId ? ((entity as any).post_isLikedByUser > 0 || false) : false;
-      
+
       const mappedPost: any = {
         ...entity,
         isLiked,
@@ -592,11 +687,11 @@ export class PostsService {
         return post.distance <= radius;
       });
       const afterFilter = result.length;
-      
+
       if (beforeFilter !== afterFilter) {
       }
-      
-      
+
+
       // Log de distancias para debugging
       if (result.length > 0) {
         const distances = result.map(p => p.distance?.toFixed(2) + 'km').join(', ');
@@ -604,7 +699,7 @@ export class PostsService {
     }
 
     const enrichedResult = await this.enrichWithPollCounts(result);
-    
+
     // Agregar estado de usuario si está autenticado
     return this.enrichWithUserState(enrichedResult, userId);
   }

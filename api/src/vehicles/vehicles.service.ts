@@ -31,6 +31,9 @@ export class VehiclesService {
       alias: createVehicleDto.alias,
       lastMileage: createVehicleDto.lastMileage || 0,
       photoUrl: createVehicleDto.photoUrl,
+      fuelType: createVehicleDto.fuelType,
+      transmission: createVehicleDto.transmission,
+      engineSize: createVehicleDto.engineSize,
     });
     return await this.vehiclesRepository.save(newVehicle);
   }
