@@ -28,6 +28,9 @@ export class Comment {
     @Column({ name: 'is_solution', default: false })
     isSolution: boolean;
 
+    @Column({ name: 'is_professional', default: false })
+    isProfessional: boolean;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 }

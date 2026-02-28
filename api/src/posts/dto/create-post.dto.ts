@@ -45,4 +45,9 @@ export class CreatePostDto {
     @IsArray()
     @IsOptional()
     pollOptions?: string[]; // Ejemplo: ["Opción A", "Opción B"]
+
+    // --- Identidad Dual ---
+    @IsBoolean()
+    @IsOptional()
+    isProfessional?: boolean;
 }

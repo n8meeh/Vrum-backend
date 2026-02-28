@@ -59,6 +59,9 @@ export class Post {
     @Column({ type: 'enum', enum: ['active', 'hidden', 'flagged'], default: 'active' })
     status: string;
 
+    @Column({ name: 'is_professional', default: false })
+    isProfessional: boolean;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

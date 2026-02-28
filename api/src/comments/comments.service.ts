@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository, MoreThan, In } from 'typeorm';
 import { Comment } from './entities/comment.entity';
 import { User } from '../users/entities/user.entity';
 import { Post } from '../posts/entities/post.entity';
@@ -37,6 +37,17 @@ export class CommentsService {
       }
     }
 
+    // 1.5 Validación de Identidad Profesional
+    if (createCommentDto.isProfessional) {
+      const user = await this.usersRepo.findOne({ where: { id: userId } });
+      if (!user || user.role !== 'provider') {
+        throw new ForbiddenException('Solo los proveedores pueden comentar como profesional.');
+      }
+      if (!provider) {
+        throw new ForbiddenException('No se encontró perfil de proveedor asociado.');
+      }
+    }
+
     // 2. Validar que el post exista
     const post = await this.postsRepo.findOne({ where: { id: createCommentDto.postId } });
     if (!post) {
@@ -56,7 +67,8 @@ export class CommentsService {
       content: createCommentDto.content,
       postId: createCommentDto.postId,
       authorId: authorId,
-      isSolution: false // Default value
+      isSolution: false,
+      isProfessional: createCommentDto.isProfessional || false,
     });
 
     const saved = await this.commentsRepository.save(comment);
@@ -64,7 +76,28 @@ export class CommentsService {
     // Counter Cache: incrementar commentsCount en el post
     await this.postsRepo.increment({ id: comment.postId }, 'commentsCount', 1);
 
-    return saved;
+    // Recargar con relación author para devolver datos completos
+    const fullComment = await this.commentsRepository.findOne({
+      where: { id: saved.id },
+      relations: ['author'],
+    });
+
+    // Transformar autor si es comentario profesional (Identidad Dual)
+    if (fullComment && fullComment.isProfessional) {
+      const prov = await this.providersRepository.findOne({
+        where: { userId: fullComment.authorId },
+      });
+      if (prov) {
+        (fullComment as any).author = {
+          ...fullComment.author,
+          fullName: prov.businessName,
+          avatarUrl: prov.logoUrl,
+          provider: { id: prov.id },
+        };
+      }
+    }
+
+    return fullComment || saved;
   }
 
   // Editar Comentario
@@ -174,12 +207,13 @@ export class CommentsService {
   }
 
   async findAll(postId: number) {
-    return this.commentsRepository.find({
+    const comments = await this.commentsRepository.find({
       where: { postId },
-      relations: ['author'], // Necesitamos saber quién comentó
+      relations: ['author'],
       select: {
         id: true,
         content: true,
+        isProfessional: true,
         createdAt: true,
         author: {
           id: true,
@@ -188,18 +222,70 @@ export class CommentsService {
           role: true
         }
       },
-      order: { createdAt: 'ASC' } // Comentarios más viejos arriba (estilo hilo) o DESC para lo nuevo primero
+      order: { createdAt: 'ASC' }
     });
+
+    // Transformar autor para comentarios profesionales (Identidad Dual)
+    const proComments = comments.filter(c => c.isProfessional);
+    if (proComments.length > 0) {
+      const authorIds = [...new Set(proComments.map(c => c.authorId))];
+      const providers = await this.providersRepository.find({
+        where: { userId: In(authorIds) },
+      });
+      const providerMap = new Map(providers.map(p => [p.userId, p]));
+
+      for (const comment of comments) {
+        if (comment.isProfessional) {
+          const prov = providerMap.get(comment.authorId);
+          if (prov) {
+            (comment as any).author = {
+              ...comment.author,
+              fullName: prov.businessName,
+              avatarUrl: prov.logoUrl,
+              provider: { id: prov.id },
+            };
+          }
+        }
+      }
+    }
+
+    return comments;
   }
 
-  findAllByPost(postId: number) {
-    return this.commentsRepository.find({
+  async findAllByPost(postId: number) {
+    const comments = await this.commentsRepository.find({
       where: { postId },
       relations: ['author'],
       order: {
-        isSolution: 'DESC', // Truco: Muestra la solución primero si existe
+        isSolution: 'DESC',
         createdAt: 'ASC'
       }
     });
+
+    // Transformar autor para comentarios profesionales (Identidad Dual)
+    const proComments = comments.filter(c => c.isProfessional);
+    if (proComments.length > 0) {
+      const authorIds = [...new Set(proComments.map(c => c.authorId))];
+      const providers = await this.providersRepository.find({
+        where: { userId: In(authorIds) },
+      });
+      const providerMap = new Map(providers.map(p => [p.userId, p]));
+
+      for (const comment of comments) {
+        if (comment.isProfessional) {
+          const prov = providerMap.get(comment.authorId);
+          if (prov) {
+            (comment as any).author = {
+              ...comment.author,
+              fullName: prov.businessName,
+              avatarUrl: prov.logoUrl,
+              provider: { id: prov.id },
+            };
+          }
+        }
+      }
+    }
+
+    return comments;
   }
 }

@@ -95,6 +95,29 @@ export class PostsService {
 
     const enrichedPosts = await this.enrichWithPollCounts(mappedPosts);
 
+    // Transformar autor para posts profesionales (Identidad Dual)
+    const professionalUserPosts = enrichedPosts.filter((p: any) => p.isProfessional);
+    if (professionalUserPosts.length > 0) {
+      const proAuthorIds = [...new Set(professionalUserPosts.map((p: any) => p.authorId))];
+      const providers = await this.providersRepository.find({
+        where: { userId: In(proAuthorIds) },
+      });
+      const providerMap = new Map(providers.map(p => [p.userId, p]));
+      for (const post of enrichedPosts) {
+        if ((post as any).isProfessional) {
+          const prov = providerMap.get((post as any).authorId);
+          if (prov) {
+            (post as any).author = {
+              ...(post as any).author,
+              fullName: prov.businessName,
+              avatarUrl: prov.logoUrl,
+              provider: { id: prov.id },
+            };
+          }
+        }
+      }
+    }
+
     if (viewerId) {
       return this.enrichWithUserState(enrichedPosts, viewerId);
     }
@@ -151,6 +174,29 @@ export class PostsService {
 
     const enrichedPosts = await this.enrichWithPollCounts(mappedPosts);
 
+    // Transformar autor para posts profesionales (Identidad Dual)
+    const professionalProvPosts = enrichedPosts.filter((p: any) => p.isProfessional);
+    if (professionalProvPosts.length > 0) {
+      const proAuthorIds = [...new Set(professionalProvPosts.map((p: any) => p.authorId))];
+      const providers = await this.providersRepository.find({
+        where: { userId: In(proAuthorIds) },
+      });
+      const providerMap = new Map(providers.map(p => [p.userId, p]));
+      for (const post of enrichedPosts) {
+        if ((post as any).isProfessional) {
+          const prov = providerMap.get((post as any).authorId);
+          if (prov) {
+            (post as any).author = {
+              ...(post as any).author,
+              fullName: prov.businessName,
+              avatarUrl: prov.logoUrl,
+              provider: { id: prov.id },
+            };
+          }
+        }
+      }
+    }
+
     if (viewerId) {
       return this.enrichWithUserState(enrichedPosts, viewerId);
     }
@@ -184,6 +230,36 @@ export class PostsService {
         throw new ForbiddenException('Has alcanzado tu límite de 3 publicaciones mensuales. ¡Pásate a Premium para publicar sin límites!');
       }
     }
+
+    // Validación de Identidad Profesional
+    if (createPostDto.isProfessional) {
+      const user = await this.usersRepo.findOne({ where: { id: userId } });
+      if (!user || user.role !== 'provider') {
+        throw new ForbiddenException('Solo los proveedores pueden publicar como profesional.');
+      }
+      if (!provider) {
+        throw new ForbiddenException('No se encontró perfil de proveedor asociado.');
+      }
+
+      // Paywall: Límite de 2 posts profesionales/mes para no-premium
+      if (!provider.isPremium) {
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const proPostsCount = await this.postsRepository.count({
+          where: {
+            authorId: userId,
+            isProfessional: true,
+            createdAt: MoreThan(firstDayOfMonth),
+          },
+        });
+        if (proPostsCount >= 2) {
+          throw new ForbiddenException(
+            'Has alcanzado tu límite de 2 publicaciones profesionales mensuales. ¡Pásate a Premium para publicar sin límites!',
+          );
+        }
+      }
+    }
+
     const content = createPostDto.content || '';
     const hashtags = this.extractHashtags(content);
     const postTags: Tag[] = [];
@@ -205,6 +281,7 @@ export class PostsService {
     const newPost = this.postsRepository.create({
       ...createPostDto,
       authorId: createPostDto.authorId || userId,
+      providerId: createPostDto.isProfessional && provider ? provider.id : undefined,
       tags: postTags
     });
 
@@ -467,6 +544,30 @@ export class PostsService {
       };
     });
 
+    // Transformar autor para posts profesionales (Identidad Dual)
+    const professionalPosts = mappedPosts.filter(p => p.isProfessional);
+    if (professionalPosts.length > 0) {
+      const authorIds = [...new Set(professionalPosts.map(p => p.authorId))];
+      const providers = await this.providersRepository.find({
+        where: { userId: In(authorIds) },
+      });
+      const providerMap = new Map(providers.map(p => [p.userId, p]));
+
+      for (const post of mappedPosts) {
+        if (post.isProfessional) {
+          const prov = providerMap.get(post.authorId);
+          if (prov) {
+            post.author = {
+              ...post.author,
+              fullName: prov.businessName,
+              avatarUrl: prov.logoUrl,
+              provider: { id: prov.id },
+            } as any;
+          }
+        }
+      }
+    }
+
     const enrichedPosts = await this.enrichWithPollCounts(mappedPosts);
 
     // Agregar userVotedOption si hay usuario autenticado
@@ -503,6 +604,20 @@ export class PostsService {
     enrichedPost.likesCount = await this.postLikesRepository.count({ where: { postId: id } });
     enrichedPost.commentsCount = post.commentsCount || 0;
 
+    // Transformar autor para post profesional (Identidad Dual)
+    if (enrichedPost.isProfessional) {
+      const prov = await this.providersRepository.findOne({
+        where: { userId: enrichedPost.authorId },
+      });
+      if (prov) {
+        enrichedPost.author = {
+          ...enrichedPost.author,
+          fullName: prov.businessName,
+          avatarUrl: prov.logoUrl,
+          provider: { id: prov.id },
+        };
+      }
+    }
 
     return enrichedPost;
   }
@@ -695,6 +810,30 @@ export class PostsService {
       // Log de distancias para debugging
       if (result.length > 0) {
         const distances = result.map(p => p.distance?.toFixed(2) + 'km').join(', ');
+      }
+    }
+
+    // Transformar autor para posts profesionales (Identidad Dual)
+    const professionalFeedPosts = result.filter(p => p.isProfessional);
+    if (professionalFeedPosts.length > 0) {
+      const authorIds = [...new Set(professionalFeedPosts.map(p => p.authorId))];
+      const providers = await this.providersRepository.find({
+        where: { userId: In(authorIds) },
+      });
+      const providerMap = new Map(providers.map(p => [p.userId, p]));
+
+      for (const post of result) {
+        if (post.isProfessional) {
+          const prov = providerMap.get(post.authorId);
+          if (prov) {
+            post.author = {
+              ...post.author,
+              fullName: prov.businessName,
+              avatarUrl: prov.logoUrl,
+              provider: { id: prov.id },
+            } as any;
+          }
+        }
       }
     }
 

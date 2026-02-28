@@ -1,4 +1,4 @@
-import { IsInt, IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsInt, IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreateCommentDto {
     @IsInt()
@@ -12,4 +12,8 @@ export class CreateCommentDto {
     @IsInt()
     @IsOptional()
     authorId?: number; // Opcional para pruebas; si no viene, se usa el userId del JWT
+
+    @IsBoolean()
+    @IsOptional()
+    isProfessional?: boolean;
 }
