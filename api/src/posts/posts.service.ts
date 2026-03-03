@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, MoreThan, Repository } from 'typeorm';
 import { Provider } from '../providers/entities/provider.entity';
+import { NotificationTriggerService } from '../notifications/notification-trigger.service';
 import { UserBlock } from '../users/entities/user-block.entity';
 import { UserFollow } from '../users/entities/user-follow.entity';
 import { User } from '../users/entities/user.entity'; // Asegúrate que la ruta sea correcta
@@ -24,6 +25,7 @@ export class PostsService {
     @InjectRepository(UserBlock) private blockRepository: Repository<UserBlock>,
     @InjectRepository(Provider) private providersRepository: Repository<Provider>,
     @InjectRepository(User) private usersRepo: Repository<User>,
+    private notificationTrigger: NotificationTriggerService,
   ) { }
 
   /**
@@ -540,6 +542,10 @@ export class PostsService {
       await this.postLikesRepository.save(newLike);
       post.likesCount += 1;
       await this.postsRepository.save(post);
+
+      // Disparar notificación de like
+      this.notificationTrigger.onLike(userId, postId, post.authorId).catch(() => {});
+
       return { status: 'liked', likesCount: post.likesCount };
     }
   }

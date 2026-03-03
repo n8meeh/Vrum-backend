@@ -6,6 +6,7 @@ import { Comment } from './entities/comment.entity';
 import { User } from '../users/entities/user.entity';
 import { Post } from '../posts/entities/post.entity';
 import { Provider } from '../providers/entities/provider.entity';
+import { NotificationTriggerService } from '../notifications/notification-trigger.service';
 @Injectable()
 export class CommentsService {
   constructor(
@@ -14,6 +15,7 @@ export class CommentsService {
     @InjectRepository(Post) private postsRepo: Repository<Post>,
     @InjectRepository(User) private usersRepo: Repository<User>,
     @InjectRepository(Provider) private providersRepository: Repository<Provider>,
+    private notificationTrigger: NotificationTriggerService,
   ) { }
 
   /**
@@ -175,6 +177,12 @@ export class CommentsService {
       }
     }
 
+    // Disparar notificación de comentario (usar nombre de negocio si es profesional)
+    const notifName = (createCommentDto.isProfessional && provider)
+      ? provider.businessName
+      : undefined;
+    this.notificationTrigger.onComment(authorId, post.id, post.authorId, notifName).catch(() => {});
+
     return fullComment || saved;
   }
 
@@ -276,6 +284,9 @@ export class CommentsService {
     if (!isSelfAnswer) {
       await this.usersRepo.increment({ id: comment.authorId }, 'solutionsCount', 1);
     }
+
+    // Disparar notificación de solución marcada
+    this.notificationTrigger.onSolutionMarked(userId, comment.authorId, comment.post.id).catch(() => {});
 
     const message = isSelfAnswer
       ? 'Solución marcada (sin puntos por auto-respuesta)'

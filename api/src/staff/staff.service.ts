@@ -11,6 +11,7 @@ import { randomBytes } from 'crypto';
 import { StaffInvitation } from './entities/staff-invitation.entity';
 import { User } from '../users/entities/user.entity';
 import { Provider } from '../providers/entities/provider.entity';
+import { NotificationTriggerService } from '../notifications/notification-trigger.service';
 
 @Injectable()
 export class StaffService {
@@ -18,6 +19,7 @@ export class StaffService {
     @InjectRepository(StaffInvitation) private invitationsRepo: Repository<StaffInvitation>,
     @InjectRepository(User) private usersRepo: Repository<User>,
     @InjectRepository(Provider) private providersRepo: Repository<Provider>,
+    private notificationTrigger: NotificationTriggerService,
   ) {}
 
   /**
@@ -97,6 +99,9 @@ export class StaffService {
     });
 
     const saved = await this.invitationsRepo.save(invitation);
+
+    // Disparar notificación de invitación de negocio
+    this.notificationTrigger.onBusinessInvite(userId, email, provider.businessName).catch(() => {});
 
     // TODO: Enviar email real con el token/link de invitación
     console.log(`=========================================`);

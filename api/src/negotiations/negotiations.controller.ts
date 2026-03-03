@@ -14,17 +14,27 @@ export class NegotiationsController {
     return this.negotiationsService.sendMessage(req.user.userId, createMessageDto);
   }
 
-  // 2. Ver historial
+  // 2. Obtener conteos de mensajes no leídos (ruta estática antes de dinámicas)
+  @Get('unread-counts')
+  getUnreadCounts(@Request() req) {
+    return this.negotiationsService.getUnreadCounts(req.user.userId);
+  }
+
+  // 3. Ver historial
   @Get('order/:orderId')
   getChatHistory(@Request() req, @Param('orderId') orderId: string) {
     return this.negotiationsService.getChatHistory(req.user.userId, +orderId);
   }
 
-  // 3. Aceptar oferta
+  // 4. Marcar chat de una orden como leído
+  @Patch('order/:orderId/read')
+  markChatAsRead(@Request() req, @Param('orderId') orderId: string) {
+    return this.negotiationsService.markChatAsRead(req.user.userId, +orderId);
+  }
+
+  // 5. Aceptar oferta
   @Patch(':id/accept')
   acceptOffer(@Request() req, @Param('id') id: string) {
     return this.negotiationsService.acceptOffer(+id, req.user.userId);
   }
-
-  // ❌ ELIMINA LOS MÉTODOS VIEJOS (create, findAllByOrder) QUE DAN ERROR
 }

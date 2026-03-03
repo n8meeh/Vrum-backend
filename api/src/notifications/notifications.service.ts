@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as admin from 'firebase-admin';
-import { Notification } from './entities/notification.entity';
+import { Notification, NotificationType } from './entities/notification.entity';
 
 @Injectable()
 export class NotificationsService {
@@ -13,9 +13,63 @@ export class NotificationsService {
   ) { }
 
   /** Guarda una notificación en base de datos para que el usuario la vea en la App. */
-  async createInApp(userId: number, title: string, body: string): Promise<void> {
-    const notification = this.notificationRepo.create({ userId, title, body });
-    await this.notificationRepo.save(notification);
+  async createInApp(
+    userId: number,
+    title: string,
+    body: string,
+    type: NotificationType = 'system',
+    relatedId?: number,
+  ): Promise<Notification> {
+    const notification = this.notificationRepo.create({
+      userId,
+      title,
+      body,
+      type,
+      ...(relatedId !== undefined && { relatedId }),
+    });
+    return this.notificationRepo.save(notification) as Promise<Notification>;
+  }
+
+  /** Lista paginada de notificaciones del usuario */
+  async findByUser(userId: number, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await this.notificationRepo.findAndCount({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    return {
+      items,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /** Marcar una notificación como leída */
+  async markAsRead(notificationId: number, userId: number): Promise<void> {
+    await this.notificationRepo.update(
+      { id: notificationId, userId },
+      { isRead: true },
+    );
+  }
+
+  /** Marcar todas las notificaciones del usuario como leídas */
+  async markAllAsRead(userId: number): Promise<void> {
+    await this.notificationRepo.update(
+      { userId, isRead: false },
+      { isRead: true },
+    );
+  }
+
+  /** Contar notificaciones no leídas */
+  async getUnreadCount(userId: number): Promise<number> {
+    return this.notificationRepo.count({
+      where: { userId, isRead: false },
+    });
   }
 
   // Función genérica para enviar Push
@@ -31,14 +85,13 @@ export class NotificationsService {
         },
         // Data sirve para que al tocar la notif, la App sepa a dónde ir (ej: ir a la orden 4)
         data: {
-          click_action: 'FLUTTER_NOTIFICATION_CLICK', // O lo que use tu frontend
+          click_action: 'FLUTTER_NOTIFICATION_CLICK',
           ...data
         }
       });
       console.log(`🔔 Notificación enviada a: ${token.substring(0, 10)}...`);
     } catch (error) {
       console.error('Error enviando notificación:', error.message);
-      // Aquí podrías borrar el token si Firebase dice que ya no es válido (opcional)
     }
   }
 }

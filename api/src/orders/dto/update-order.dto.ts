@@ -8,7 +8,7 @@ export class UpdateOrderDto extends PartialType(CreateOrderDto) {
     // 👇 2. Agrega los decoradores para que NestJS acepte el campo
     @IsOptional()
     @IsString()
-    @IsEnum(['pending', 'accepted', 'completed', 'cancelled']) // Valida que sea uno de estos
+    @IsEnum(['pending', 'accepted', 'in_progress', 'completed', 'cancelled'])
     status?: string;
 
     @IsOptional()

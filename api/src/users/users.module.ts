@@ -8,9 +8,10 @@ import { UserBlock } from './entities/user-block.entity';
 import { UserFollow } from './entities/user-follow.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { Post } from '../posts/entities/post.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, UserBlock, UserFollow, Vehicle, Post])],
+  imports: [NotificationsModule, TypeOrmModule.forFeature([User, UserBlock, UserFollow, Vehicle, Post])],
   controllers: [UsersController],
   providers: [UsersService, UsersScheduler],
   exports: [UsersService],

@@ -7,9 +7,11 @@ import { Comment } from './entities/comment.entity';
 import { Provider } from '../providers/entities/provider.entity';
 import { Post } from '../posts/entities/post.entity';
 import { User } from '../users/entities/user.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
+    NotificationsModule,
     TypeOrmModule.forFeature([
       Comment,  // Tu entidad principal
       Provider, // 👈 NECESARIA PARA LA VALIDACIÓN FREEMIUM

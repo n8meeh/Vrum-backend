@@ -9,6 +9,7 @@ import { UserBlock } from './entities/user-block.entity';
 import { UserFollow } from './entities/user-follow.entity';
 import { Vehicle } from '../vehicles/entities/vehicle.entity';
 import { Post } from '../posts/entities/post.entity';
+import { NotificationTriggerService } from '../notifications/notification-trigger.service';
 
 @Injectable()
 export class UsersService {
@@ -18,6 +19,7 @@ export class UsersService {
     @InjectRepository(UserFollow) private followRepo: Repository<UserFollow>,
     @InjectRepository(Vehicle) private vehicleRepo: Repository<Vehicle>,
     @InjectRepository(Post) private postRepo: Repository<Post>,
+    private notificationTrigger: NotificationTriggerService,
   ) { }
 
   /**
@@ -436,6 +438,10 @@ export class UsersService {
     } else {
       const newFollow = this.followRepo.create({ followerId, followedId });
       await this.followRepo.save(newFollow);
+
+      // Disparar notificación de follow
+      this.notificationTrigger.onFollow(followerId, followedId).catch(() => {});
+
       return { status: 'followed', message: `Ahora sigues a ${targetUser.fullName}` };
     }
   }

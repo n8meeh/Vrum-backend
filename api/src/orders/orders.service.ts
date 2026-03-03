@@ -167,11 +167,24 @@ export class OrdersService {
 
   async getMyOrders(userId: number, role: string) {
     if (role === 'client' || role === 'user') {
-      return this.ordersRepository.find({
-        where: { client: { id: userId } },
-        relations: ['provider', 'vehicle', 'post'],
-        order: { createdAt: 'DESC' }
-      });
+      return this.ordersRepository
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.provider', 'provider')
+        .leftJoinAndSelect('order.vehicle', 'vehicle')
+        .leftJoinAndSelect('order.post', 'post')
+        .leftJoin(
+          (qb) =>
+            qb
+              .select('n.order_id', 'order_id')
+              .addSelect('MAX(n.created_at)', 'last_activity')
+              .from('order_negotiations', 'n')
+              .groupBy('n.order_id'),
+          'last_msg',
+          'last_msg.order_id = order.id',
+        )
+        .where('order.client_id = :userId', { userId })
+        .orderBy('COALESCE(last_msg.last_activity, order.created_at)', 'DESC')
+        .getMany();
     }
 
     // provider, provider_admin, provider_staff — todos ven las órdenes del negocio
@@ -179,11 +192,24 @@ export class OrdersService {
       const provider = await this.resolveProviderForUser(userId);
       if (!provider) return [];
 
-      return this.ordersRepository.find({
-        where: { provider: { id: provider.id } },
-        relations: ['client', 'vehicle', 'post'],
-        order: { createdAt: 'DESC' }
-      });
+      return this.ordersRepository
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.client', 'client')
+        .leftJoinAndSelect('order.vehicle', 'vehicle')
+        .leftJoinAndSelect('order.post', 'post')
+        .leftJoin(
+          (qb) =>
+            qb
+              .select('n.order_id', 'order_id')
+              .addSelect('MAX(n.created_at)', 'last_activity')
+              .from('order_negotiations', 'n')
+              .groupBy('n.order_id'),
+          'last_msg',
+          'last_msg.order_id = order.id',
+        )
+        .where('order.provider_id = :providerId', { providerId: provider.id })
+        .orderBy('COALESCE(last_msg.last_activity, order.created_at)', 'DESC')
+        .getMany();
     }
 
     return [];
@@ -193,7 +219,7 @@ export class OrdersService {
     // 1. Buscar la orden completa con relaciones
     const order = await this.ordersRepository.findOne({
       where: { id },
-      relations: ['provider', 'client']
+      relations: ['provider', 'provider.user', 'client']
     });
 
     if (!order) {
@@ -224,8 +250,17 @@ export class OrdersService {
         }
       }
 
-      // Validar transición: accepted -> completed (cliente, proveedor o staff)
-      else if (currentStatus === 'accepted' && newStatus === 'completed') {
+      // Validar transición: accepted -> in_progress (solo proveedor o staff)
+      else if (currentStatus === 'accepted' && newStatus === 'in_progress') {
+        const isOwner = userId === order.providerId;
+        const isStaff = await isStaffOfProvider();
+        if (!isOwner && !isStaff) {
+          throw new ForbiddenException('Solo el proveedor o su equipo pueden iniciar el trabajo');
+        }
+      }
+
+      // Validar transición: accepted/in_progress -> completed (cliente, proveedor o staff)
+      else if ((currentStatus === 'accepted' || currentStatus === 'in_progress') && newStatus === 'completed') {
         const isOwner = userId === order.providerId;
         const isClient = userId === order.clientId;
         const isStaff = await isStaffOfProvider();
@@ -279,15 +314,40 @@ export class OrdersService {
     const { currentMileage, ...orderData } = updateOrderDto;
     await this.ordersRepository.update(id, orderData);
 
-    // 4. Push notification al cliente cuando el proveedor acepta
+    // 4. Push notifications según cambio de estado
+    const providerName = order.provider?.businessName || 'El proveedor';
+
     if (updateOrderDto.status === 'accepted' && order.client?.fcmToken) {
-      const providerName = order.provider?.businessName || 'El proveedor';
       await this.notificationsService.sendPushNotification(
         order.client.fcmToken,
         '¡Tu solicitud fue aceptada!',
         `${providerName} ha aceptado tu orden de servicio.`,
         { orderId: String(id), screen: 'orders' },
       );
+    }
+
+    if (updateOrderDto.status === 'in_progress' && order.client?.fcmToken) {
+      await this.notificationsService.sendPushNotification(
+        order.client.fcmToken,
+        'Trabajo iniciado',
+        `${providerName} ha comenzado a trabajar en tu orden.`,
+        { orderId: String(id), screen: 'orders' },
+      );
+    }
+
+    if (updateOrderDto.status === 'cancelled') {
+      // Notificar a la otra parte
+      const isClient = userId === order.clientId;
+      const targetToken = isClient ? order.provider?.user?.fcmToken : order.client?.fcmToken;
+      const cancellerName = isClient ? 'El cliente' : providerName;
+      if (targetToken) {
+        await this.notificationsService.sendPushNotification(
+          targetToken,
+          'Orden cancelada',
+          `${cancellerName} ha cancelado la orden.`,
+          { orderId: String(id), screen: 'orders' },
+        );
+      }
     }
 
     return this.findOne(id);

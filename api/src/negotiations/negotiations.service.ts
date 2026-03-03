@@ -2,18 +2,22 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException,
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Negotiation } from './entities/negotiation.entity';
+import { ChatRead } from './entities/chat-read.entity';
 import { Order } from '../orders/entities/order.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { NegotiationsGateway } from './negotiations.gateway';
+import { NotificationTriggerService } from '../notifications/notification-trigger.service';
 
 @Injectable()
 export class NegotiationsService {
   constructor(
     @InjectRepository(Negotiation) private negotiationsRepository: Repository<Negotiation>,
+    @InjectRepository(ChatRead) private chatReadRepository: Repository<ChatRead>,
     @InjectRepository(Order) private ordersRepository: Repository<Order>,
     @InjectRepository(User) private usersRepository: Repository<User>,
     @Inject(forwardRef(() => NegotiationsGateway)) private gateway: NegotiationsGateway,
+    private notificationTrigger: NotificationTriggerService,
   ) { }
 
   /**
@@ -68,6 +72,23 @@ export class NegotiationsService {
 
     // Emitir en tiempo real a todos los participantes de la orden
     this.gateway.emitNewMessage(dto.orderId, savedWithAuthor);
+
+    // Notificar al otro participante (push + in-app)
+    const senderName = savedWithAuthor?.author?.fullName || 'Alguien';
+    const recipientIds: number[] = [];
+
+    // Si el que envía es el cliente, notificar al dueño del negocio
+    // Si el que envía es del negocio, notificar al cliente
+    if (order.clientId !== userId) {
+      recipientIds.push(order.clientId);
+    }
+    if (order.provider?.userId && order.provider.userId !== userId) {
+      recipientIds.push(order.provider.userId);
+    }
+
+    for (const recipientId of recipientIds) {
+      this.notificationTrigger.onChatMessage(userId, senderName, recipientId, dto.orderId).catch(() => {});
+    }
 
     return savedWithAuthor;
   }
@@ -128,6 +149,48 @@ export class NegotiationsService {
     return await this.ordersRepository.save(negotiation.order);
   }
 
-  // Nota: Borré 'findAllByOrder' porque 'getChatHistory' hace lo mismo y ya lo arreglamos.
-  // Si tu controlador usa 'findAllByOrder', cambia el nombre de la función de arriba o cambia el controlador.
+  // 4. MARCAR CHAT COMO LEÍDO
+  async markChatAsRead(userId: number, orderId: number): Promise<void> {
+    // Usar raw SQL para copiar el timestamp EXACTO del último mensaje
+    // directamente en MySQL, evitando pérdida de precisión de microsegundos
+    // al pasar por JavaScript Date (que solo soporta milisegundos).
+    await this.chatReadRepository.query(
+      `INSERT INTO chat_reads (user_id, order_id, last_read_at)
+       SELECT ?, ?, COALESCE(
+         (SELECT MAX(created_at) FROM order_negotiations WHERE order_id = ?),
+         NOW(6)
+       )
+       ON DUPLICATE KEY UPDATE last_read_at = VALUES(last_read_at)`,
+      [userId, orderId, orderId],
+    );
+  }
+
+  // 5. OBTENER CONTEOS DE MENSAJES NO LEÍDOS POR ORDEN
+  async getUnreadCounts(userId: number): Promise<{ orderId: number; unreadCount: number }[]> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) return [];
+
+    // Una sola query SQL que hace todo el cálculo dentro de MySQL,
+    // evitando que los timestamps pasen por JavaScript Date (que pierde microsegundos).
+    const providerCondition = user.providerId
+      ? `OR p.id = ?`
+      : `OR p.user_id = ?`;
+    const providerParam = user.providerId || userId;
+
+    const rows: { orderId: number; unreadCount: string }[] = await this.chatReadRepository.query(
+      `SELECT n.order_id AS orderId, COUNT(*) AS unreadCount
+       FROM order_negotiations n
+       INNER JOIN orders o ON o.id = n.order_id
+       LEFT JOIN providers p ON p.id = o.provider_id
+       LEFT JOIN chat_reads cr ON cr.order_id = n.order_id AND cr.user_id = ?
+       WHERE (o.client_id = ? ${providerCondition})
+         AND n.author_id != ?
+         AND (cr.last_read_at IS NULL OR n.created_at > cr.last_read_at)
+       GROUP BY n.order_id
+       HAVING COUNT(*) > 0`,
+      [userId, userId, providerParam, userId],
+    );
+
+    return rows.map(r => ({ orderId: Number(r.orderId), unreadCount: Number(r.unreadCount) }));
+  }
 }
