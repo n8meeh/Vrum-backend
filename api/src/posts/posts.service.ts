@@ -664,22 +664,8 @@ export class PostsService {
       allowedVisibilities.push('users_only');
     }
     else if (['provider', 'provider_admin', 'provider_staff'].includes(user.role)) {
-      // Proveedores y staff ven: public + contenido específico de su categoría
-      let feedProvider: Provider | null = null;
-      if (user.role === 'provider') {
-        feedProvider = await this.providersRepository.findOne({ where: { userId } });
-      } else if (user.providerId) {
-        feedProvider = await this.providersRepository.findOne({ where: { id: user.providerId } });
-      }
-      if (feedProvider) {
-        // Mapeo de categorías a visibilidades específicas
-        if (feedProvider.category === 'mechanic') {
-          allowedVisibilities.push('mechanics_only');
-        } else if (feedProvider.category === 'tow') {
-          allowedVisibilities.push('tow_only');
-        }
-        // Otras categorías solo ven 'public' por defecto
-      }
+      // Proveedores y staff ven: public + contenido de mecánicos
+      allowedVisibilities.push('mechanics_only');
     }
 
     // 2. CONSTRUCCIÓN DE LA CONSULTA BASE 🏗️

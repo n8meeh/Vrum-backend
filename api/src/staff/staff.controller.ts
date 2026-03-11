@@ -73,6 +73,16 @@ export class StaffController {
   }
 
   /**
+   * POST /staff/leave — Abandonar el equipo
+   * Solo: provider_admin, provider_staff
+   */
+  @Post('leave')
+  @UseGuards(AuthGuard('jwt'))
+  leave(@Request() req) {
+    return this.staffService.leaveTeam(req.user.id);
+  }
+
+  /**
    * DELETE /staff/members/:userId — Eliminar miembro del equipo
    * Solo: provider (dueño), provider_admin
    */

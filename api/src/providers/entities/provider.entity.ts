@@ -56,17 +56,10 @@ export class Provider {
     @Column({ type: 'text', nullable: true })
     description: string;
 
-    @Column({
-        type: 'enum',
-        enum: ['mechanic', 'electrician', 'body_shop', 'tires', 'audio_security', 'tow', 'wash', 'store', 'driving_school', 'other']
-    })
+    // Columna legacy — no se usa en lógica, pero la BD la requiere NOT NULL
+    @Column({ default: 'other' })
     category: string;
 
-    // ...
-    // 👇 CAMBIA ESTO: Agrega { name: 'secondary_categories' }
-    @Column({ name: 'secondary_categories', type: 'json', nullable: true })
-    secondaryCategories: string[];
-    // ...
     @Column({ name: 'is_home_service', default: false })
     isHomeService: boolean;
 

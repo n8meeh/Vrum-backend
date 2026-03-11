@@ -1,6 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateProviderDto } from './create-provider.dto';
-import { IsBoolean, IsOptional, IsArray, IsString, ValidateNested } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // Clase anidada para validar contactos
@@ -20,12 +20,6 @@ export class UpdateProviderDto extends PartialType(CreateProviderDto) {
     @IsOptional()
     @IsBoolean()
     isVisible?: boolean;
-
-    // Múltiples especialidades secundarias
-    @IsOptional()
-    @IsArray()
-    @IsString({ each: true })
-    secondaryCategories?: string[];
 
     // Servicio a domicilio
     @IsOptional()

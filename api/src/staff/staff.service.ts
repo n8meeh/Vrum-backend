@@ -320,6 +320,28 @@ export class StaffService {
   }
 
   /**
+   * Abandonar el equipo (solo provider_staff y provider_admin)
+   */
+  async leaveTeam(userId: number) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    if (!['provider_admin', 'provider_staff'].includes(user.role)) {
+      throw new ForbiddenException('Solo miembros del equipo pueden abandonar un negocio.');
+    }
+
+    if (!user.providerId) {
+      throw new BadRequestException('No estás vinculado a ningún negocio.');
+    }
+
+    user.role = 'user';
+    user.providerId = null;
+    await this.usersRepo.save(user);
+
+    return { message: 'Has abandonado el equipo correctamente.' };
+  }
+
+  /**
    * Cancelar una invitación pendiente
    */
   async cancelInvitation(userId: number, invitationId: number) {

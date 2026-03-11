@@ -63,8 +63,7 @@ export class ProvidersService {
     const provider = await this.findOneByUserId(userId);
     if (!provider) throw new BadRequestException('No eres un proveedor');
 
-    // Actualizamos todos los campos del DTO (incluyendo secondaryCategories)
-    // TypeORM convierte automáticamente el array a JSON al guardar
+    // Actualizamos todos los campos del DTO
     Object.assign(provider, dto);
 
     const savedProvider = await this.providersRepository.save(provider);
@@ -85,7 +84,22 @@ export class ProvidersService {
     // 1. Lo ocultamos del mapa
     await this.providersRepository.update(provider.id, { isVisible: false });
 
-    // 2. Ejecutamos el Soft Delete (Sin tocar el rol del usuario)
+    // 2. Desvincular staff: cambiar rol a 'user' y quitar providerId
+    const staffMembers = await this.usersRepo.find({
+      where: { providerId: provider.id },
+    });
+    for (const staff of staffMembers) {
+      staff.role = 'user';
+      staff.providerId = null;
+    }
+    if (staffMembers.length > 0) {
+      await this.usersRepo.save(staffMembers);
+    }
+
+    // 3. Cambiar rol del dueño a 'user'
+    await this.usersService.updateRole(userId, 'user');
+
+    // 4. Ejecutamos el Soft Delete
     await this.providersRepository.softDelete(provider.id);
 
     return { message: 'Taller cerrado correctamente. Historial preservado.' };
@@ -158,12 +172,6 @@ export class ProvidersService {
   async create(userId: number, createProviderDto: CreateProviderDto) {
     let savedProvider: Provider;
 
-    // 🆕 ASEGURAR CATEGORÍA POR DEFECTO: Si no se proporciona, usar 'other'
-    const providerData = {
-      ...createProviderDto,
-      category: createProviderDto.category || 'other', // Defecto a 'other' si es undefined
-    };
-
     // 1. Buscamos si ya existe (incluso si está borrado "soft-delete")
     const existingProvider = await this.providersRepository.findOne({
       where: { userId },
@@ -182,15 +190,15 @@ export class ProvidersService {
       // B) Aseguramos que sea visible
       existingProvider.isVisible = true;
 
-      // C) Actualizamos los datos viejos con los nuevos (con categoría garantizada)
-      const providerToUpdate = this.providersRepository.merge(existingProvider, providerData);
+      // C) Actualizamos los datos viejos con los nuevos
+      const providerToUpdate = this.providersRepository.merge(existingProvider, createProviderDto);
 
       // D) Guardamos los cambios
       savedProvider = await this.providersRepository.save(providerToUpdate);
     } else {
-      // 2. SI NO EXISTE: Creamos uno nuevo desde cero (con categoría garantizada)
+      // 2. SI NO EXISTE: Creamos uno nuevo desde cero
       const newProvider = this.providersRepository.create({
-        ...providerData,
+        ...createProviderDto,
         userId: userId,
         isVisible: true,
       });
@@ -296,9 +304,7 @@ export class ProvidersService {
     return null;
   }
 
-  async findNearby(lat: number, lng: number, radius: number, category?: string) {
-    // Log de debugging para verificar parámetros recibidos
-
+  async findNearby(lat: number, lng: number, radius: number) {
     const query = this.providersRepository
       .createQueryBuilder('provider')
       .leftJoinAndSelect('provider.specialties', 'specialties')
@@ -317,17 +323,6 @@ export class ProvidersService {
       // Solo usuarios activos y no eliminados
       .andWhere('user.isVisible = :userVisible', { userVisible: true })
       .andWhere('user.deletedAt IS NULL');
-
-    // LÓGICA DE FILTRADO POR CATEGORÍA (Principal O Secundaria)
-    if (category && category !== 'all') {
-      query.andWhere(
-        '(provider.category = :category OR provider.secondaryCategories LIKE :jsonCategory)',
-        {
-          category: category,
-          jsonCategory: `%"${category}"%` // Busca ej: "electrician" dentro del string JSON
-        }
-      );
-    }
 
     const results = await query
       .having('distance <= :radius')

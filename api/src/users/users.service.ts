@@ -221,7 +221,6 @@ export class UsersService {
           id: true,
           businessName: true,
           ratingAvg: true,
-          category: true
         }
       }
     });
@@ -468,7 +467,6 @@ export class UsersService {
       provider: follow.followed.provider ? {
         id: follow.followed.provider.id,
         businessName: follow.followed.provider.businessName,
-        category: follow.followed.provider.category
       } : null
     }));
   }
@@ -491,7 +489,6 @@ export class UsersService {
       provider: follow.follower.provider ? {
         id: follow.follower.provider.id,
         businessName: follow.follower.provider.businessName,
-        category: follow.follower.provider.category
       } : null
     }));
   }
@@ -528,7 +525,6 @@ export class UsersService {
         provider: {
           id: true,
           businessName: true,
-          category: true
         }
       }
     });
@@ -542,7 +538,6 @@ export class UsersService {
       provider: user.provider ? {
         id: user.provider.id,
         businessName: user.provider.businessName,
-        category: user.provider.category
       } : null
     }));
   }

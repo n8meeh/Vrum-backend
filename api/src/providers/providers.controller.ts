@@ -65,21 +65,18 @@ export class ProvidersController {
     return { ok: true };
   }
 
-  // En providers.controller.ts
   @Get('nearby')
   findNearby(
     @Query('lat') lat: string,
     @Query('lng') lng: string,
     @Query('radius') radius?: string, // Radius es opcional
-    @Query('category') category?: string
   ) {
     // Conversión explícita y segura a números
     const latitude = Number(lat);
     const longitude = Number(lng);
     const radiusKm = radius ? Number(radius) : 10; // Default 10km si no se especifica
-    
-    
-    return this.providersService.findNearby(latitude, longitude, radiusKm, category);
+
+    return this.providersService.findNearby(latitude, longitude, radiusKm);
   }
 
   @UseGuards(AuthGuard('jwt'))
