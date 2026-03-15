@@ -1,13 +1,17 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { AdminService } from './admin.service';
 import { ApplyStrikeDto } from './dto/apply-strike.dto';
 import { UnbanUserDto } from './dto/unban-user.dto';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 @Controller('admin')
 @UseGuards(AdminGuard)
 export class AdminController {
-    constructor(private readonly adminService: AdminService) {}
+    constructor(
+        private readonly adminService: AdminService,
+        private readonly subscriptionsService: SubscriptionsService,
+    ) {}
 
     /**
      * POST /admin/strike
@@ -34,5 +38,27 @@ export class AdminController {
     @Get('moderation/:userId')
     getModerationInfo(@Param('userId', ParseIntPipe) userId: number) {
         return this.adminService.getUserModerationInfo(userId);
+    }
+
+    /**
+     * GET /admin/fraud-alerts
+     * Lista todas las alertas de fraude pendientes.
+     */
+    @Get('fraud-alerts')
+    getFraudAlerts() {
+        return this.subscriptionsService.getFraudAlerts();
+    }
+
+    /**
+     * PATCH /admin/fraud-alerts/:id/resolve
+     * Resuelve una alerta de fraude (dismiss o confirm).
+     */
+    @Patch('fraud-alerts/:id/resolve')
+    resolveFraudAlert(
+        @Param('id', ParseIntPipe) id: number,
+        @Body('action') action: 'dismissed' | 'confirmed',
+        @Request() req,
+    ) {
+        return this.subscriptionsService.resolveFraudAlert(id, action, req.user.userId);
     }
 }

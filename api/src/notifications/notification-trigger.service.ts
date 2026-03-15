@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NotificationsService } from './notifications.service';
 import { User } from '../users/entities/user.entity';
+import { NegotiationsGateway } from '../negotiations/negotiations.gateway';
 
 @Injectable()
 export class NotificationTriggerService {
@@ -11,6 +12,8 @@ export class NotificationTriggerService {
     private notificationsService: NotificationsService,
     @InjectRepository(User)
     private usersRepo: Repository<User>,
+    @Inject(forwardRef(() => NegotiationsGateway))
+    private gateway: NegotiationsGateway,
   ) { }
 
   /** Notificar cuando un usuario sigue a otro */
@@ -27,6 +30,7 @@ export class NotificationTriggerService {
     const body = `${follower.fullName || 'Alguien'} empezó a seguirte`;
 
     await this.notificationsService.createInApp(followedId, title, body, 'social_follow', followerId);
+    this.gateway.emitNewNotification(followedId);
 
     if (followed.fcmToken) {
       await this.notificationsService.sendPushNotification(
@@ -50,6 +54,7 @@ export class NotificationTriggerService {
     const body = `A ${liker.fullName || 'Alguien'} le gustó tu publicación`;
 
     await this.notificationsService.createInApp(postAuthorId, title, body, 'social_like', postId);
+    this.gateway.emitNewNotification(postAuthorId);
 
     if (author.fcmToken) {
       await this.notificationsService.sendPushNotification(
@@ -75,6 +80,7 @@ export class NotificationTriggerService {
     const body = `${displayName} comentó en tu publicación`;
 
     await this.notificationsService.createInApp(postAuthorId, title, body, 'social_comment', postId);
+    this.gateway.emitNewNotification(postAuthorId);
 
     if (author.fcmToken) {
       await this.notificationsService.sendPushNotification(
@@ -98,6 +104,7 @@ export class NotificationTriggerService {
     const body = `${postAuthor.fullName || 'Alguien'} marcó tu comentario como solución`;
 
     await this.notificationsService.createInApp(commentAuthorId, title, body, 'post_solved', postId);
+    this.gateway.emitNewNotification(commentAuthorId);
 
     if (commentAuthor.fcmToken) {
       await this.notificationsService.sendPushNotification(
@@ -122,7 +129,10 @@ export class NotificationTriggerService {
     const title = 'Nuevo mensaje';
     const body = `${senderName} te envió un mensaje`;
 
-    // Solo push — los mensajes de chat se muestran en la pantalla de Actividad
+    // Badge en tiempo real vía WebSocket
+    this.gateway.emitNewChatMessage(recipientId);
+
+    // Push notification
     if (recipient.fcmToken) {
       await this.notificationsService.sendPushNotification(
         recipient.fcmToken, title, body,
@@ -143,6 +153,7 @@ export class NotificationTriggerService {
     const body = `${inviter.fullName || 'Alguien'} te invitó a unirte a ${providerName}`;
 
     await this.notificationsService.createInApp(invitee.id, title, body, 'business_invite', inviterId);
+    this.gateway.emitNewNotification(invitee.id);
 
     if (invitee.fcmToken) {
       await this.notificationsService.sendPushNotification(

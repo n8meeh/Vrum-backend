@@ -26,6 +26,9 @@ export class Subscription {
   @Column({ name: 'external_reference', type: 'varchar', length: 255, nullable: true })
   externalReference: string | null;
 
+  @Column({ name: 'device_id', type: 'varchar', length: 255, nullable: true })
+  deviceId: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

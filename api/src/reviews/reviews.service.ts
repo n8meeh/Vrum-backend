@@ -26,7 +26,7 @@ export class ReviewsService {
     });
     
     if (!order) {
-      throw new NotFoundException(`Orden con ID ${dto.orderId} no encontrada`);
+      throw new NotFoundException('La orden no fue encontrada');
     }
 
     // PASO 2: Verificar que la orden pertenezca al cliente autenticado
@@ -45,7 +45,7 @@ export class ReviewsService {
     });
     
     if (existingReview) {
-      throw new ConflictException('Ya existe una calificación para esta orden');
+      throw new ConflictException('Ya calificaste este servicio');
     }
 
     // PASO 5: Calcular el rating overall (promedio)

@@ -108,7 +108,7 @@ export class CommentsService {
         throw new ForbiddenException('Solo los miembros de un negocio pueden comentar como profesional.');
       }
       if (!provider) {
-        throw new ForbiddenException('No se encontró perfil de proveedor asociado.');
+        throw new ForbiddenException('Tu cuenta no está vinculada a ningún negocio');
       }
 
       // Límite de 5 comentarios profesionales/mes para proveedores no-premium
@@ -133,7 +133,7 @@ export class CommentsService {
     // 2. Validar que el post exista
     const post = await this.postsRepo.findOne({ where: { id: createCommentDto.postId } });
     if (!post) {
-      throw new NotFoundException(`Post con ID ${createCommentDto.postId} no encontrado`);
+      throw new NotFoundException('La publicación ya no existe o fue eliminada');
     }
 
     // 2.1. Bloquear comentarios en hilos resueltos
@@ -192,7 +192,7 @@ export class CommentsService {
     const comment = await this.commentsRepository.findOne({ where: { id: commentId } });
 
     if (!comment) throw new NotFoundException('Comentario no encontrado');
-    if (comment.authorId !== userId) throw new ForbiddenException('No es tu comentario');
+    if (comment.authorId !== userId) throw new ForbiddenException('Solo puedes modificar tus propios comentarios');
 
     comment.content = content;
     return await this.commentsRepository.save(comment);
@@ -203,7 +203,7 @@ export class CommentsService {
     const comment = await this.commentsRepository.findOne({ where: { id: commentId } });
 
     if (!comment) throw new NotFoundException('Comentario no encontrado');
-    if (comment.authorId !== userId) throw new ForbiddenException('No es tu comentario');
+    if (comment.authorId !== userId) throw new ForbiddenException('Solo puedes modificar tus propios comentarios');
 
     const postId = comment.postId;
 
@@ -228,7 +228,7 @@ export class CommentsService {
     // 2. SEGURIDAD: Solo el autor del post puede marcar/desmarcar la solución
 
     if (Number(comment.post.authorId) !== Number(userId)) {
-      throw new ForbiddenException('No tienes permiso para marcar esta solución');
+      throw new ForbiddenException('Solo el autor de la publicación puede marcar soluciones');
     }
 
     // 3. TOGGLE LOGIC

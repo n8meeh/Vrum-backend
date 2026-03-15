@@ -1,4 +1,4 @@
-import { Controller, Post, Get, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, Post, Get, UseGuards, Request } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { SubscriptionsService } from './subscriptions.service';
 
@@ -8,8 +8,14 @@ export class SubscriptionsController {
 
   @UseGuards(AuthGuard('jwt'))
   @Post('activate-trial')
-  activateTrial(@Request() req) {
-    return this.subscriptionsService.activateTrial(req.user.userId);
+  activateTrial(@Request() req, @Body('deviceId') deviceId?: string) {
+    return this.subscriptionsService.activateTrial(req.user.userId, deviceId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('request-premium')
+  requestPremium(@Request() req) {
+    return this.subscriptionsService.requestPremium(req.user.userId);
   }
 
   @UseGuards(AuthGuard('jwt'))

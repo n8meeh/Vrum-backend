@@ -51,7 +51,7 @@ export class OrdersService {
     // 🔍 1. Obtenemos el Provider (como dueño o staff)
     const provider = await this.resolveProviderForUser(userId);
 
-    if (!provider) throw new UnauthorizedException('Solo los miembros de un negocio pueden enviar propuestas');
+    if (!provider) throw new UnauthorizedException('Necesitas tener un negocio registrado para enviar propuestas');
 
     // 🛑 2. Validación Freemium (Límite 2 propuestas/mes)
     if (!provider.isPremium) {
@@ -73,7 +73,7 @@ export class OrdersService {
 
     // 3. Validar el Post
     const post = await this.postsService.findOne(dto.postId);
-    if (!post) throw new NotFoundException('El post no existe');
+    if (!post) throw new NotFoundException('La publicación ya no existe o fue eliminada');
 
     // 3.1. Bloquear propuestas en hilos resueltos
     if ((post as any).isSolved) {
@@ -82,7 +82,7 @@ export class OrdersService {
 
     // (Eliminé la segunda búsqueda de provider aquí porque ya la hicimos arriba)
 
-    if (post.authorId === userId) throw new BadRequestException('No puedes ofertarte a ti mismo');
+    if (post.authorId === userId) throw new BadRequestException('No puedes enviar una propuesta a tu propia publicación');
 
     // 🔴 3.5. Evitar Duplicados: Verificar si ya existe una propuesta de este proveedor para este post
     const existingProposal = await this.ordersRepository.findOne({
@@ -225,7 +225,7 @@ export class OrdersService {
     });
 
     if (!order) {
-      throw new NotFoundException('Orden no encontrada');
+      throw new NotFoundException('La orden no fue encontrada');
     }
 
     // 2. Si se está actualizando el estado, aplicar máquina de estados
@@ -323,7 +323,7 @@ export class OrdersService {
       // Transición no válida
       else if (currentStatus !== newStatus) {
         throw new BadRequestException(
-          `Transición de estado no válida: ${currentStatus} -> ${newStatus}`
+          'No se puede cambiar el estado de la orden en este momento'
         );
       }
     }

@@ -13,13 +13,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Negotiation, ChatRead, Order, User]),
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'CLAVE_SECRETA_SUPER_SEGURA',
     }),
   ],
   controllers: [NegotiationsController],
   providers: [NegotiationsService, NegotiationsGateway],
-  exports: [NegotiationsService],
+  exports: [NegotiationsService, NegotiationsGateway],
 })
 export class NegotiationsModule {}

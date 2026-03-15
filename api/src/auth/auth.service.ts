@@ -24,7 +24,7 @@ export class AuthService {
     // 1. Verificar si el usuario ya existe
     const existingUser = await this.usersService.findByEmail(registerDto.email);
     if (existingUser) {
-      throw new ConflictException('El email ya está registrado');
+      throw new ConflictException('Ya existe una cuenta con este correo electrónico');
     }
 
     // 2. Crear el usuario (UsersService ya hashea la contraseña)
@@ -94,7 +94,7 @@ export class AuthService {
   async verifyResetCode(email: string, code: string) {
     const user = await this.usersService.findByEmailAndResetCode(email, code);
     if (!user) {
-      throw new BadRequestException('Código inválido o expirado.');
+      throw new BadRequestException('El código ingresado no es válido o ya expiró. Solicita uno nuevo.');
     }
     return { message: 'Código verificado correctamente.' };
   }
@@ -103,7 +103,7 @@ export class AuthService {
   async resetPassword(email: string, code: string, newPassword: string) {
     const user = await this.usersService.findByEmailAndResetCode(email, code);
     if (!user) {
-      throw new BadRequestException('Código inválido o expirado.');
+      throw new BadRequestException('El código ingresado no es válido o ya expiró. Solicita uno nuevo.');
     }
 
     const salt = await bcrypt.genSalt();

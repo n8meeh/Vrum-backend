@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { CreateProviderDto } from './dto/create-provider.dto';
 import { UpdateProviderDto } from './dto/update-provider.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -13,9 +13,12 @@ import { UpdateSpecialtiesDto } from './dto/update-specialties.dto';
 import { Specialty } from './entities/specialty.entity';
 import { UsersService } from '../users/users.service';
 import { MetricsService } from './metrics.service';
+import { EmailService } from '../auth/email.service';
 
 @Injectable()
 export class ProvidersService {
+  private readonly logger = new Logger(ProvidersService.name);
+
   constructor(
     @InjectRepository(Provider) private providersRepository: Repository<Provider>,
     @InjectRepository(ProviderService) private providerServicesRepo: Repository<ProviderService>,
@@ -24,19 +27,20 @@ export class ProvidersService {
     @InjectRepository(Specialty) private specialtiesRepo: Repository<Specialty>,
     private usersService: UsersService,
     private metricsService: MetricsService,
+    private emailService: EmailService,
   ) { }
 
   // --- GESTIÓN DE TIPOS DE VEHÍCULO ---
   async updateVehicleTypes(userId: number, typeIds: number[]) {
     const found = await this.findOneByUserId(userId);
-    if (!found) throw new BadRequestException('No eres un proveedor');
+    if (!found) throw new BadRequestException('No tienes un negocio registrado');
 
     // Recargar con la relación específica necesaria
     const provider = await this.providersRepository.findOne({
       where: { id: found.id },
       relations: ['vehicleTypes']
     });
-    if (!provider) throw new NotFoundException('Proveedor no encontrado');
+    if (!provider) throw new NotFoundException('No se encontró el negocio');
 
     // Si el array está vacío, borramos todas las relaciones
     if (typeIds.length === 0) {
@@ -50,7 +54,7 @@ export class ProvidersService {
     });
 
     if (types.length !== typeIds.length) {
-      throw new BadRequestException('Alguno de los tipos de vehículo enviados no existe');
+      throw new BadRequestException('Uno o más tipos de vehículo seleccionados no son válidos');
     }
 
     // Sync: Reemplazar la lista actual con la nueva
@@ -61,7 +65,7 @@ export class ProvidersService {
   // --- TALLER ---
   async update(userId: number, dto: UpdateProviderDto) {
     const provider = await this.findOneByUserId(userId);
-    if (!provider) throw new BadRequestException('No eres un proveedor');
+    if (!provider) throw new BadRequestException('No tienes un negocio registrado');
 
     // Actualizamos todos los campos del DTO
     Object.assign(provider, dto);
@@ -79,7 +83,7 @@ export class ProvidersService {
 
   async deleteProvider(userId: number) {
     const provider = await this.findOneByUserId(userId);
-    if (!provider) throw new BadRequestException('No eres un proveedor');
+    if (!provider) throw new BadRequestException('No tienes un negocio registrado');
 
     // 1. Lo ocultamos del mapa
     await this.providersRepository.update(provider.id, { isVisible: false });
@@ -102,19 +106,32 @@ export class ProvidersService {
     // 4. Ejecutamos el Soft Delete
     await this.providersRepository.softDelete(provider.id);
 
+    // 📧 Enviar correo de cierre del negocio
+    try {
+      const user = await this.usersRepo.findOne({ where: { id: userId } });
+      if (user?.email) {
+        await this.emailService.sendProviderClosedEmail(
+          user.email,
+          provider.businessName || 'tu negocio',
+        );
+      }
+    } catch (err) {
+      this.logger.error(`No se pudo enviar correo de cierre de negocio: ${err.message}`);
+    }
+
     return { message: 'Taller cerrado correctamente. Historial preservado.' };
   }
 
   // 🆕 Actualizar todas las especialidades en un solo endpoint
   async updateSpecialties(userId: number, dto: UpdateSpecialtiesDto) {
     const found = await this.findOneByUserId(userId);
-    if (!found) throw new BadRequestException('No eres un proveedor');
+    if (!found) throw new BadRequestException('No tienes un negocio registrado');
 
     const provider = await this.providersRepository.findOne({
       where: { id: found.id },
       relations: ['vehicleTypes', 'specialties']
     });
-    if (!provider) throw new NotFoundException('Proveedor no encontrado');
+    if (!provider) throw new NotFoundException('No se encontró el negocio');
 
     // 🆕 SISTEMA JERÁRQUICO: Actualizar especialidades
     if (dto.specialtyIds !== undefined) {
@@ -126,7 +143,7 @@ export class ProvidersService {
         });
 
         if (specialties.length !== dto.specialtyIds.length) {
-          throw new BadRequestException('Alguna de las especialidades enviadas no existe');
+          throw new BadRequestException('Una o más especialidades seleccionadas no son válidas');
         }
 
         provider.specialties = specialties;
@@ -160,7 +177,7 @@ export class ProvidersService {
       });
 
       if (types.length !== dto.vehicleTypeIds.length) {
-        throw new BadRequestException('Alguno de los tipos de vehículo no existe');
+        throw new BadRequestException('Uno o más tipos de vehículo seleccionados no son válidos');
       }
 
       provider.vehicleTypes = types;
@@ -208,6 +225,19 @@ export class ProvidersService {
 
     // 🆕 LÓGICA DE ASCENSO: Actualizar rol del usuario a 'provider'
     await this.usersService.updateRole(userId, 'provider');
+
+    // 📧 Enviar correo de bienvenida al proveedor
+    try {
+      const user = await this.usersRepo.findOne({ where: { id: userId } });
+      if (user?.email) {
+        await this.emailService.sendProviderWelcomeEmail(
+          user.email,
+          savedProvider.businessName || 'tu negocio',
+        );
+      }
+    } catch (err) {
+      this.logger.error(`No se pudo enviar correo de bienvenida al proveedor: ${err.message}`);
+    }
 
     // 🧹 LIMPIEZA: Quitamos el usuario de la respuesta para seguridad
     // Usamos (savedProvider as any) para evitar el error TS2790
@@ -336,7 +366,7 @@ export class ProvidersService {
   // --- SERVICIOS ---
   async addService(userId: number, dto: CreateProviderServiceDto) {
     const provider = await this.findOneByUserId(userId);
-    if (!provider) throw new BadRequestException('No eres un proveedor');
+    if (!provider) throw new BadRequestException('No tienes un negocio registrado');
 
     // Límite de 7 servicios para proveedores no-premium
     if (!provider.isPremium) {
@@ -357,7 +387,7 @@ export class ProvidersService {
 
   async getMyServices(userId: number) {
     const provider = await this.findOneByUserId(userId);
-    if (!provider) throw new BadRequestException('No eres un proveedor');
+    if (!provider) throw new BadRequestException('No tienes un negocio registrado');
     return this.providerServicesRepo.find({
       where: { providerId: provider.id },
       relations: ['vehicleType']
@@ -366,11 +396,11 @@ export class ProvidersService {
 
   async updateService(userId: number, serviceId: number, dto: UpdateProviderServiceDto) {
     const provider = await this.findOneByUserId(userId);
-    if (!provider) throw new BadRequestException('No eres un proveedor');
+    if (!provider) throw new BadRequestException('No tienes un negocio registrado');
     const service = await this.providerServicesRepo.findOne({
       where: { id: serviceId, providerId: provider.id }
     });
-    if (!service) throw new NotFoundException('Servicio no encontrado');
+    if (!service) throw new NotFoundException('El servicio que intentas modificar no existe');
 
     Object.assign(service, dto);
     return await this.providerServicesRepo.save(service);
@@ -378,11 +408,11 @@ export class ProvidersService {
 
   async deleteService(userId: number, serviceId: number) {
     const provider = await this.findOneByUserId(userId);
-    if (!provider) throw new BadRequestException('No eres un proveedor');
+    if (!provider) throw new BadRequestException('No tienes un negocio registrado');
     const service = await this.providerServicesRepo.findOne({
       where: { id: serviceId, providerId: provider.id }
     });
-    if (!service) throw new NotFoundException('Servicio no encontrado');
+    if (!service) throw new NotFoundException('El servicio que intentas modificar no existe');
 
     await this.providerServicesRepo.remove(service);
     return { message: 'Servicio eliminado' };
@@ -391,7 +421,7 @@ export class ProvidersService {
   // Interruptor de "Vacaciones" (Ocultar/Mostrar en mapa)
   async toggleVisibility(userId: number) {
     const provider = await this.findOneByUserId(userId);
-    if (!provider) throw new BadRequestException('No eres un proveedor');
+    if (!provider) throw new BadRequestException('No tienes un negocio registrado');
     provider.isVisible = !provider.isVisible;
     await this.providersRepository.save(provider);
 
@@ -404,7 +434,7 @@ export class ProvidersService {
   // --- MÉTRICAS DE NEGOCIO ---
   async getMyMetrics(userId: number) {
     const provider = await this.findOneByUserId(userId);
-    if (!provider) throw new BadRequestException('No eres un proveedor');
+    if (!provider) throw new BadRequestException('No tienes un negocio registrado');
 
     const stats = await this.metricsService.getAggregated(provider.id);
     const conversionRate = stats.profileViews > 0

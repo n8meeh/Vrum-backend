@@ -102,8 +102,8 @@ export class PostsService {
   async update(id: number, userId: number, dto: UpdatePostDto) {
     const post = await this.postsRepository.findOne({ where: { id } });
 
-    if (!post) throw new NotFoundException('Post no encontrado');
-    if (post.authorId !== userId) throw new ForbiddenException('No puedes editar un post que no es tuyo');
+    if (!post) throw new NotFoundException('La publicación no fue encontrada');
+    if (post.authorId !== userId) throw new ForbiddenException('Solo puedes editar tus propias publicaciones');
 
     Object.assign(post, dto);
     return await this.postsRepository.save(post);
@@ -113,8 +113,8 @@ export class PostsService {
   async remove(id: number, userId: number) {
     const post = await this.postsRepository.findOne({ where: { id } });
 
-    if (!post) throw new NotFoundException('Post no encontrado');
-    if (post.authorId !== userId) throw new ForbiddenException('No puedes eliminar un post que no es tuyo');
+    if (!post) throw new NotFoundException('La publicación no fue encontrada');
+    if (post.authorId !== userId) throw new ForbiddenException('Solo puedes eliminar tus propias publicaciones');
 
     post.status = 'hidden';
     await this.postsRepository.save(post);
@@ -261,7 +261,7 @@ export class PostsService {
         throw new ForbiddenException('Solo los miembros de un negocio pueden publicar como profesional.');
       }
       if (!provider) {
-        throw new ForbiddenException('No se encontró perfil de proveedor asociado.');
+        throw new ForbiddenException('Tu cuenta no está vinculada a ningún negocio');
       }
 
       // Límite de 3 publicaciones profesionales/mes para proveedores no-premium
@@ -430,7 +430,7 @@ export class PostsService {
 
     const options = post.pollOptions as string[];
     if (!options || optionIndex < 0 || optionIndex >= options.length) {
-      throw new BadRequestException('Opción de voto inválida');
+      throw new BadRequestException('La opción seleccionada no es válida');
     }
 
     // Buscar si ya existe un voto de este usuario para este post
@@ -677,21 +677,22 @@ export class PostsService {
     const { lat, lng, radius, limit, offset, filter, search, tag } = dto;
 
     // 1. LÓGICA DE PERMISOS 🔐
-    const user = await this.usersRepo.findOne({ where: { id: userId } });
-
-    if (!user) throw new NotFoundException('Usuario no encontrado');
-
-    // Lista base: Todos ven lo público
     const allowedVisibilities = ['public'];
 
-    // Filtrado por rol según reglas de negocio
-    if (user.role === 'user') {
-      // Clientes ven: public y users_only
-      allowedVisibilities.push('users_only');
-    }
-    else if (['provider', 'provider_admin', 'provider_staff'].includes(user.role)) {
-      // Proveedores y staff ven: public + contenido de mecánicos
-      allowedVisibilities.push('mechanics_only');
+    if (userId) {
+      const user = await this.usersRepo.findOne({ where: { id: userId } });
+
+      if (user) {
+        // Filtrado por rol según reglas de negocio
+        if (user.role === 'user') {
+          // Clientes ven: public y users_only
+          allowedVisibilities.push('users_only');
+        }
+        else if (['provider', 'provider_admin', 'provider_staff'].includes(user.role)) {
+          // Proveedores y staff ven: public + contenido de mecánicos
+          allowedVisibilities.push('mechanics_only');
+        }
+      }
     }
 
     // 2. CONSTRUCCIÓN DE LA CONSULTA BASE 🏗️

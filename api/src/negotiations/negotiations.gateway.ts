@@ -74,10 +74,38 @@ export class NegotiationsGateway implements OnGatewayConnection {
   }
 
   /**
+   * El cliente emite 'join-user' con su userId para recibir
+   * actualizaciones de badges (notificaciones y chats) en tiempo real.
+   */
+  @SubscribeMessage('join-user')
+  handleJoinUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() userId: number,
+  ) {
+    client.join(`user-${userId}`);
+  }
+
+  /**
    * Emite un nuevo mensaje a todos los participantes de la orden.
    * Llamado por NegotiationsService después de guardar el mensaje en BD.
    */
   emitNewMessage(orderId: number, message: unknown) {
     this.server.to(`order-${orderId}`).emit('new_message', message);
+  }
+
+  /**
+   * Emite evento de nueva notificación al usuario para actualizar badge.
+   * Llamado por NotificationTriggerService cuando se crea una notificación.
+   */
+  emitNewNotification(userId: number) {
+    this.server.to(`user-${userId}`).emit('new_notification');
+  }
+
+  /**
+   * Emite evento de nuevo mensaje de chat al usuario para actualizar badge.
+   * Llamado por NegotiationsService cuando se envía un mensaje.
+   */
+  emitNewChatMessage(userId: number) {
+    this.server.to(`user-${userId}`).emit('new_chat_message');
   }
 }

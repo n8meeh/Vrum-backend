@@ -41,10 +41,10 @@ export class NegotiationsService {
       relations: ['provider', 'provider.user', 'client']
     });
 
-    if (!order) throw new NotFoundException('Orden no encontrada');
+    if (!order) throw new NotFoundException('La orden no fue encontrada');
 
     const canAccess = await this.isOrderParticipant(userId, order);
-    if (!canAccess) throw new ForbiddenException('Sin permiso');
+    if (!canAccess) throw new ForbiddenException('No tienes acceso a esta conversación');
 
     const newMessage = this.negotiationsRepository.create({
       orderId: dto.orderId,
@@ -99,10 +99,10 @@ export class NegotiationsService {
       where: { id: orderId },
       relations: ['provider', 'provider.user'],
     });
-    if (!order) throw new NotFoundException('Orden no encontrada');
+    if (!order) throw new NotFoundException('La orden no fue encontrada');
 
     const canAccess = await this.isOrderParticipant(userId, order);
-    if (!canAccess) throw new ForbiddenException('Sin permiso');
+    if (!canAccess) throw new ForbiddenException('No tienes acceso a esta conversación');
 
     // Ahora buscamos los mensajes con el filtro SELECT
     return this.negotiationsRepository.find({
@@ -127,7 +127,7 @@ export class NegotiationsService {
   // 3. ACEPTAR OFERTA
   async acceptOffer(negotiationId: number, userId: number) {
     const negotiation = await this.negotiationsRepository.findOne({ where: { id: negotiationId }, relations: ['order'] });
-    if (!negotiation) throw new BadRequestException('Propuesta no encontrada');
+    if (!negotiation) throw new BadRequestException('La propuesta ya no está disponible');
 
     if (negotiation.authorId === userId) {
       throw new BadRequestException('No puedes aceptar tu propia oferta');

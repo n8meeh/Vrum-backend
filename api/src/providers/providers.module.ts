@@ -11,6 +11,7 @@ import { Specialty } from './entities/specialty.entity';
 import { ProviderMetric } from './entities/provider-metric.entity';
 import { MetricsService } from './metrics.service';
 import { UsersModule } from '../users/users.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { UsersModule } from '../users/users.module';
       ProviderMetric,
     ]),
     UsersModule,
+    AuthModule,
   ],
   controllers: [ProvidersController],
   providers: [ProvidersService, MetricsService],

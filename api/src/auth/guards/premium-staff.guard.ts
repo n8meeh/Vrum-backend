@@ -29,7 +29,7 @@ export class PremiumStaffGuard extends AuthGuard('jwt') implements CanActivate {
         const user = request.user;
 
         if (!user) {
-            throw new ForbiddenException('No autenticado');
+            throw new ForbiddenException('Tu sesión ha expirado. Inicia sesión nuevamente.');
         }
 
         const role = user.role;

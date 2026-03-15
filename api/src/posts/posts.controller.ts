@@ -72,10 +72,11 @@ export class PostsController {
     return this.postsService.findAllByProvider(+providerId, viewerId);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('feed')
   getFeed(@Request() req, @Query() query: GetFeedDto) {
-    return this.postsService.getFeed(req.user.userId, query);
+    const userId = req.user?.userId ?? 0;
+    return this.postsService.getFeed(userId, query);
   }
 
   // ... dentro de la clase
