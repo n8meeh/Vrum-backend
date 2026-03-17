@@ -1,10 +1,13 @@
 import { Injectable, UnauthorizedException, BadRequestException, NotFoundException, ConflictException, ForbiddenException, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { RegisterDto } from './dto/register.dto';
 import { EmailService } from './email.service';
+import { Provider } from '../providers/entities/provider.entity';
 
 @Injectable()
 export class AuthService {
@@ -14,6 +17,7 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private emailService: EmailService,
+    @InjectRepository(Provider) private providersRepo: Repository<Provider>,
   ) { }
 
   /**
@@ -125,24 +129,51 @@ export class AuthService {
     // Registrar último acceso (usado para detección de proveedores inactivos)
     await this.usersService.updateLastLogin(user.id);
 
+    // Resolver providerId:
+    // - Staff (provider_admin/provider_staff): user.providerId ya existe en la tabla users
+    // - Dueño (provider): buscar en tabla providers por userId
+    let providerId: number | null = user.providerId || null;
+    let provider: Provider | null = null;
+
+    if (!providerId && user.role === 'provider') {
+      // El dueño del negocio: buscar el provider asociado a su userId
+      provider = await this.providersRepo.findOne({ where: { userId: user.id } });
+      if (provider) {
+        providerId = provider.id;
+      }
+    } else if (providerId) {
+      // Staff: buscar datos del negocio
+      provider = await this.providersRepo.findOne({ where: { id: providerId } });
+    }
+
+    this.logger.log(`Login: userId=${user.id}, role=${user.role}, providerId=${providerId}`);
+
     // Creamos el Payload (lo que va dentro del JWT)
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
-      providerId: user.providerId || null, // Staff: ID del negocio al que pertenece
-      sessionToken: sessionToken // Metemos el ID en el token
+      providerId: providerId,
+      sessionToken: sessionToken,
     };
 
     return {
-      access_token: this.jwtService.sign(payload), // Generamos el JWT firmado
+      access_token: this.jwtService.sign(payload),
       user: {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
         role: user.role,
-        providerId: user.providerId || null, // Staff: ID del negocio
-      }
+        providerId: providerId,
+      },
+      // Datos del negocio (si aplica)
+      provider: provider ? {
+        id: provider.id,
+        businessName: provider.businessName,
+        logoUrl: provider.logoUrl,
+        coverUrl: provider.coverUrl,
+        isPremium: provider.isPremium,
+      } : null,
     };
   }
 }

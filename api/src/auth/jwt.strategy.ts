@@ -1,11 +1,17 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
+import { Provider } from '../providers/entities/provider.entity';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-    constructor(private usersService: UsersService) {
+    constructor(
+        private usersService: UsersService,
+        @InjectRepository(Provider) private providersRepo: Repository<Provider>,
+    ) {
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
@@ -15,7 +21,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     async validate(payload: any) {
         // Verificar que el sessionToken del JWT coincida con el almacenado en BD.
-        // Esto invalida automáticamente cualquier sesión anterior al hacer login nuevo.
         const user = await this.usersService.findByIdForSession(Number(payload.sub));
 
         if (!user) {
@@ -28,7 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
             );
         }
 
-        // Verificar si el usuario está baneado (en cada petición, no solo al login)
+        // Verificar si el usuario está baneado
         if (user.bannedUntil && new Date() < new Date(user.bannedUntil)) {
             const bannedUntilDate = new Date(user.bannedUntil).toLocaleDateString('es-ES', {
                 day: '2-digit',
@@ -40,12 +45,25 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
             );
         }
 
+        // Resolver providerId:
+        // - Staff (provider_admin/provider_staff): user.providerId en tabla users
+        // - Dueño (provider): buscar en tabla providers por userId
+        let providerId: number | null = user.providerId || null;
+
+        if (!providerId && user.role === 'provider') {
+            const provider = await this.providersRepo.findOne({
+                where: { userId: Number(payload.sub) },
+                select: ['id'],
+            });
+            providerId = provider?.id || null;
+        }
+
         return {
             userId: Number(payload.sub),
-            id: Number(payload.sub), // Alias para compatibilidad
+            id: Number(payload.sub),
             email: payload.email,
-            role: user.role, // Siempre desde BD para reflejar cambios en tiempo real
-            providerId: user.providerId || null, // Siempre desde BD
+            role: user.role,
+            providerId: providerId,
         };
     }
 }
