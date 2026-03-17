@@ -1,9 +1,10 @@
 services:
   db:
     image: mysql:8.0
-    container_name: brumh_db
+    container_name: vrum_db
     restart: always
     environment:
+      # Toma los valores del .env de la raíz
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
@@ -16,38 +17,38 @@ services:
     command: --default-authentication-plugin=mysql_native_password
 
   api:
-    build:
-      context: .
-      dockerfile: api/Dockerfile
+    build: .
     container_name: brumh_api
     restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    volumes:
+      - ./firebase-adminsdk.json:/app/firebase-adminsdk.json
     environment:
-      NODE_ENV: production
-      # Inyectamos todas las variables del .env de la raíz
+      # Conexión interna a la DB
       DB_HOST: db
-      DB_PORT: ${DB_PORT}
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_ROOT_PASSWORD}
       DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
+      # Mercado Pago (Producción)
       MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN}
+      # Otras variables necesarias
       JWT_SECRET: ${JWT_SECRET}
       RESEND_API_KEY: ${RESEND_API_KEY}
       BACKEND_URL: ${BACKEND_URL}
       WEB_URL: ${WEB_URL}
       PREMIUM_PAYMENT_URL: ${PREMIUM_PAYMENT_URL}
-    ports:
-      - "3000:3000"
-    depends_on:
-      - db
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
-    container_name: brumh_pma
+    container_name: vrum_pma
     environment:
       PMA_HOST: db
       PMA_USER: root
       PMA_PASSWORD: ${DB_ROOT_PASSWORD}
-      UPLOAD_LIMIT: 64M
     ports:
       - "8081:80"
     depends_on:
