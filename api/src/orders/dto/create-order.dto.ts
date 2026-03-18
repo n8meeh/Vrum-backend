@@ -5,7 +5,8 @@ export class CreateOrderDto {
     providerId: number; // A qué taller le pido la hora
 
     @IsNumber()
-    vehicleId: number;  // Qué auto voy a llevar
+    @IsOptional()
+    vehicleId?: number;  // Qué auto voy a llevar (opcional para productos)
 
     @IsString()
     @IsOptional()
