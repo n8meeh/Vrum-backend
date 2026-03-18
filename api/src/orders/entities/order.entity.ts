@@ -1,9 +1,10 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, OneToOne } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
-import { Provider } from '../../providers/entities/provider.entity'; // Asegura la ruta
-import { Vehicle } from '../../vehicles/entities/vehicle.entity';   // Asegura la ruta
+import { Provider } from '../../providers/entities/provider.entity';
+import { Vehicle } from '../../vehicles/entities/vehicle.entity';
 import { Post } from '../../posts/entities/post.entity';
 import { Review } from '../../reviews/entities/review.entity';
+import { ProviderProduct } from '../../products/entities/provider-product.entity';
 
 @Entity('orders')
 export class Order {
@@ -66,6 +67,13 @@ export class Order {
     // 👇 CAMBIA ESTO: Agrega { name: 'is_proposal' }
     @Column({ name: 'is_proposal', default: false })
     isProposal: boolean;
+
+    @Column({ name: 'product_id', nullable: true })
+    productId: number | null;
+
+    @ManyToOne(() => ProviderProduct, { nullable: true })
+    @JoinColumn({ name: 'product_id' })
+    product: ProviderProduct | null;
 
     @OneToOne(() => Review, (review) => review.order)
     review: Review;

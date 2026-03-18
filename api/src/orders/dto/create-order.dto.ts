@@ -23,4 +23,8 @@ export class CreateOrderDto {
     @IsDateString()
     @IsOptional()
     scheduledDate?: string; // Fecha agendada en formato ISO8601
+
+    @IsNumber()
+    @IsOptional()
+    productId?: number; // Producto solicitado (opcional, solo para pedidos de productos)
 }

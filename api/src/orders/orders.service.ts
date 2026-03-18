@@ -149,6 +149,7 @@ export class OrdersService {
       client: { id: userId },
       provider: { id: dto.providerId },
       vehicle: dto.vehicleId ? { id: dto.vehicleId } : undefined,
+      product: dto.productId ? { id: dto.productId } as any : undefined,
       title: dto.title || 'Solicitud de Servicio',
       description: dto.description,
       status: 'pending',
@@ -384,6 +385,9 @@ export class OrdersService {
         'vehicle.vehicleType',
         'post',
         'review',
+        'product',
+        'product.category',
+        'product.vehicleType',
       ],
       select: {
         id: true,
@@ -434,7 +438,20 @@ export class OrdersService {
             name: true,
           }
         },
-        review: true
+        review: true,
+        product: {
+          id: true,
+          name: true,
+          description: true,
+          brand: true,
+          partNumber: true,
+          condition: true,
+          price: true,
+          stock: true,
+          imageUrl: true,
+          category: { id: true, name: true },
+          vehicleType: { id: true, name: true },
+        },
       }
     });
   }
