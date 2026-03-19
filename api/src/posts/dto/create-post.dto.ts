@@ -50,4 +50,9 @@ export class CreatePostDto {
     @IsBoolean()
     @IsOptional()
     isProfessional?: boolean;
+
+    // --- Grupos ---
+    @IsInt()
+    @IsOptional()
+    groupId?: number;
 }
