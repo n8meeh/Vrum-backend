@@ -354,7 +354,6 @@ export class CommentsService {
       createdAt: c.createdAt,
       post: {
         id: c.post.id,
-        title: c.post.title,
         content: c.post.content,
         createdAt: c.post.createdAt,
         author: {
