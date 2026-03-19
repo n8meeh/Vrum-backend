@@ -111,7 +111,15 @@ export class Provider {
     isPremium: boolean;
 
     // 0 = Nuevo, 1 = Verificado, 2 = En Investigación, 3 = Baneado
-    @Column({ name: 'is_verified', type: 'smallint', default: 0, width: 2 })
+    @Column({
+        name: 'is_verified',
+        type: 'smallint',
+        default: 0,
+        transformer: {
+            to: (value: number) => value,
+            from: (value: any) => Number(value),
+        },
+    })
     isVerified: number;
 
     // ... otras columnas
