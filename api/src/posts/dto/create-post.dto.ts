@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsBoolean, IsArray, IsNumber, IsEnum, IsInt } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsArray, IsNumber, IsEnum, IsInt, ArrayMaxSize } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreatePostDto {
     // --- Autor (Opcional para pruebas) ---
@@ -11,9 +12,15 @@ export class CreatePostDto {
     @IsOptional()
     content?: string;
 
-    @IsString()
+    @IsArray()
+    @IsString({ each: true })
+    @ArrayMaxSize(5)
     @IsOptional()
-    mediaUrl?: string; // URL de imagen/video en Firebase
+    @Transform(({ value }) => {
+        if (typeof value === 'string') return value ? [value] : [];
+        return value;
+    })
+    mediaUrl?: string[]; // Array de URLs de imágenes en Firebase (máx 5)
 
     @IsInt()
     @IsOptional()

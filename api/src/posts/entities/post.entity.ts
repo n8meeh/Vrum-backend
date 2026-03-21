@@ -30,8 +30,8 @@ export class Post {
     @Column({ type: 'text', nullable: true })
     content: string;
 
-    @Column({ name: 'media_url', nullable: true })
-    mediaUrl: string;
+    @Column({ name: 'media_url', type: 'json', nullable: true })
+    mediaUrl: string[] | null;
 
     // 👇👇👇 AGREGA ESTOS CAMPOS NUEVOS 👇👇👇
 
