@@ -1,22 +1,23 @@
 import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-  ConflictException,
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
-import { StaffInvitation } from './entities/staff-invitation.entity';
-import { User } from '../users/entities/user.entity';
-import { Provider } from '../providers/entities/provider.entity';
+import { Repository } from 'typeorm';
 import { NotificationTriggerService } from '../notifications/notification-trigger.service';
+import { Provider } from '../providers/entities/provider.entity';
+import { User } from '../users/entities/user.entity';
+import { StaffInvitation } from './entities/staff-invitation.entity';
 
 @Injectable()
 export class StaffService {
   constructor(
-    @InjectRepository(StaffInvitation) private invitationsRepo: Repository<StaffInvitation>,
+    @InjectRepository(StaffInvitation)
+    private invitationsRepo: Repository<StaffInvitation>,
     @InjectRepository(User) private usersRepo: Repository<User>,
     @InjectRepository(Provider) private providersRepo: Repository<Provider>,
     private notificationTrigger: NotificationTriggerService,
@@ -42,23 +43,32 @@ export class StaffService {
   /**
    * Invitar a un nuevo miembro al equipo
    */
-  async invite(userId: number, email: string, role: 'provider_admin' | 'provider_staff') {
+  async invite(
+    userId: number,
+    email: string,
+    role: 'provider_admin' | 'provider_staff',
+  ) {
     // 1. Obtener usuario que invita
     const inviter = await this.usersRepo.findOne({ where: { id: userId } });
     if (!inviter) throw new NotFoundException('Usuario no encontrado');
 
     // 2. Resolver el provider del invitador
     const provider = await this.resolveProviderForUser(userId);
-    if (!provider) throw new ForbiddenException('No tienes un negocio asociado');
+    if (!provider)
+      throw new ForbiddenException('No tienes un negocio asociado');
 
     // 3. Verificar Premium
     if (!provider.isPremium) {
-      throw new ForbiddenException('La gestión de equipo requiere una suscripción Premium activa.');
+      throw new ForbiddenException(
+        'La gestión de equipo requiere una suscripción Premium activa.',
+      );
     }
 
     // 4. Jerarquía de roles: provider_admin solo puede invitar provider_staff
     if (inviter.role === 'provider_admin' && role === 'provider_admin') {
-      throw new ForbiddenException('Un administrador solo puede invitar operadores (staff).');
+      throw new ForbiddenException(
+        'Un administrador solo puede invitar operadores (staff).',
+      );
     }
 
     // 5. Verificar que el email no sea del propio invitador
@@ -71,7 +81,9 @@ export class StaffService {
       where: { providerId: provider.id, email, status: 'pending' },
     });
     if (existingInvitation) {
-      throw new ConflictException('Ya existe una invitación pendiente para este email.');
+      throw new ConflictException(
+        'Ya existe una invitación pendiente para este email.',
+      );
     }
 
     // 7. Verificar si el usuario ya es miembro del equipo
@@ -101,7 +113,9 @@ export class StaffService {
     const saved = await this.invitationsRepo.save(invitation);
 
     // Disparar notificación de invitación de negocio
-    this.notificationTrigger.onBusinessInvite(userId, email, provider.businessName).catch(() => {});
+    this.notificationTrigger
+      .onBusinessInvite(userId, email, provider.businessName)
+      .catch(() => {});
 
     // TODO: Enviar email real con el token/link de invitación
     console.log(`=========================================`);
@@ -123,6 +137,45 @@ export class StaffService {
   }
 
   /**
+   * Obtener detalles de una invitación por token (sin autenticación requerida en sí,
+   * pero protegida por JWT en el controlador). Permite mostrar la preview antes de aceptar.
+   */
+  async getInvitationByToken(token: string) {
+    const invitation = await this.invitationsRepo.findOne({
+      where: { token, status: 'pending' },
+      relations: ['provider', 'inviter'],
+    });
+
+    if (!invitation) {
+      throw new NotFoundException(
+        'Invitación no encontrada o ya fue procesada.',
+      );
+    }
+
+    if (new Date() > invitation.expiresAt) {
+      invitation.status = 'expired';
+      await this.invitationsRepo.save(invitation);
+      throw new BadRequestException('La invitación ha expirado.');
+    }
+
+    return {
+      id: invitation.id,
+      role: invitation.role,
+      expiresAt: invitation.expiresAt,
+      inviter: {
+        id: invitation.inviter.id,
+        fullName: invitation.inviter.fullName,
+        avatarUrl: invitation.inviter.avatarUrl ?? null,
+      },
+      business: {
+        id: invitation.provider.id,
+        name: invitation.provider.businessName,
+        logoUrl: invitation.provider.logoUrl ?? null,
+      },
+    };
+  }
+
+  /**
    * Aceptar una invitación de staff
    */
   async acceptInvitation(userId: number, token: string) {
@@ -133,7 +186,9 @@ export class StaffService {
     });
 
     if (!invitation) {
-      throw new NotFoundException('Invitación no encontrada o ya fue procesada.');
+      throw new NotFoundException(
+        'Invitación no encontrada o ya fue procesada.',
+      );
     }
 
     // 2. Verificar expiración
@@ -148,17 +203,23 @@ export class StaffService {
     if (!user) throw new NotFoundException('Usuario no encontrado');
 
     if (user.email !== invitation.email) {
-      throw new ForbiddenException('Esta invitación no corresponde a tu cuenta.');
+      throw new ForbiddenException(
+        'Esta invitación no corresponde a tu cuenta.',
+      );
     }
 
     // 4. Verificar que el usuario no sea ya un provider (dueño de negocio)
     if (user.role === 'provider') {
-      throw new ConflictException('Ya eres dueño de un negocio. No puedes unirte como staff a otro.');
+      throw new ConflictException(
+        'Ya eres dueño de un negocio. No puedes unirte como staff a otro.',
+      );
     }
 
     // 5. Verificar Premium del provider al momento de aceptar
     if (!invitation.provider.isPremium) {
-      throw new ForbiddenException('El negocio ya no tiene suscripción Premium activa.');
+      throw new ForbiddenException(
+        'El negocio ya no tiene suscripción Premium activa.',
+      );
     }
 
     // 6. Actualizar usuario: asignar rol y vincular al provider
@@ -175,6 +236,7 @@ export class StaffService {
       role: invitation.role,
       providerId: invitation.providerId,
       businessName: invitation.provider.businessName,
+      businessLogo: invitation.provider.logoUrl ?? null,
     };
   }
 
@@ -183,7 +245,8 @@ export class StaffService {
    */
   async getInvitations(userId: number) {
     const provider = await this.resolveProviderForUser(userId);
-    if (!provider) throw new ForbiddenException('No tienes un negocio asociado');
+    if (!provider)
+      throw new ForbiddenException('No tienes un negocio asociado');
 
     return this.invitationsRepo.find({
       where: { providerId: provider.id },
@@ -209,7 +272,8 @@ export class StaffService {
    */
   async getMembers(userId: number) {
     const provider = await this.resolveProviderForUser(userId);
-    if (!provider) throw new ForbiddenException('No tienes un negocio asociado');
+    if (!provider)
+      throw new ForbiddenException('No tienes un negocio asociado');
 
     // Obtener el dueño
     const owner = await this.usersRepo.findOne({
@@ -223,7 +287,14 @@ export class StaffService {
       select: ['id', 'fullName', 'avatarUrl', 'email', 'role'],
     });
 
-    const members: { id: number; fullName: string; avatarUrl: string | null; email: string; role: string; isOwner: boolean }[] = [];
+    const members: {
+      id: number;
+      fullName: string;
+      avatarUrl: string | null;
+      email: string;
+      role: string;
+      isOwner: boolean;
+    }[] = [];
 
     // El dueño siempre va primero
     if (owner) {
@@ -257,7 +328,8 @@ export class StaffService {
    */
   async removeMember(userId: number, memberUserId: number) {
     const provider = await this.resolveProviderForUser(userId);
-    if (!provider) throw new ForbiddenException('No tienes un negocio asociado');
+    if (!provider)
+      throw new ForbiddenException('No tienes un negocio asociado');
 
     // No puedes eliminar al dueño
     if (memberUserId === provider.userId) {
@@ -268,12 +340,18 @@ export class StaffService {
     const member = await this.usersRepo.findOne({
       where: { id: memberUserId, providerId: provider.id },
     });
-    if (!member) throw new NotFoundException('Miembro no encontrado en tu equipo.');
+    if (!member)
+      throw new NotFoundException('Miembro no encontrado en tu equipo.');
 
     // Jerarquía: provider_admin no puede eliminar a otro provider_admin
     const inviter = await this.usersRepo.findOne({ where: { id: userId } });
-    if (inviter?.role === 'provider_admin' && member.role === 'provider_admin') {
-      throw new ForbiddenException('Un administrador no puede eliminar a otro administrador.');
+    if (
+      inviter?.role === 'provider_admin' &&
+      member.role === 'provider_admin'
+    ) {
+      throw new ForbiddenException(
+        'Un administrador no puede eliminar a otro administrador.',
+      );
     }
 
     // Desvincular: cambiar rol a 'user' y quitar providerId
@@ -327,7 +405,9 @@ export class StaffService {
     if (!user) throw new NotFoundException('Usuario no encontrado');
 
     if (!['provider_admin', 'provider_staff'].includes(user.role)) {
-      throw new ForbiddenException('Solo miembros del equipo pueden abandonar un negocio.');
+      throw new ForbiddenException(
+        'Solo miembros del equipo pueden abandonar un negocio.',
+      );
     }
 
     if (!user.providerId) {
@@ -346,14 +426,17 @@ export class StaffService {
    */
   async cancelInvitation(userId: number, invitationId: number) {
     const provider = await this.resolveProviderForUser(userId);
-    if (!provider) throw new ForbiddenException('No tienes un negocio asociado');
+    if (!provider)
+      throw new ForbiddenException('No tienes un negocio asociado');
 
     const invitation = await this.invitationsRepo.findOne({
       where: { id: invitationId, providerId: provider.id, status: 'pending' },
     });
 
     if (!invitation) {
-      throw new NotFoundException('Invitación no encontrada o ya fue procesada.');
+      throw new NotFoundException(
+        'Invitación no encontrada o ya fue procesada.',
+      );
     }
 
     invitation.status = 'cancelled';

@@ -1,19 +1,22 @@
 import {
-  Controller,
-  Post,
-  Get,
-  Delete,
-  Body,
-  Param,
-  UseGuards,
-  Request,
-  ParseIntPipe,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    ParseIntPipe,
+    Post,
+    Request,
+    UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { StaffService } from './staff.service';
-import { InviteStaffDto } from './dto/invite-staff.dto';
 import { PremiumStaffGuard } from '../auth/guards/premium-staff.guard';
-import { ProviderRoleGuard, ProviderRoles } from '../auth/guards/provider-role.guard';
+import {
+    ProviderRoleGuard,
+    ProviderRoles,
+} from '../auth/guards/provider-role.guard';
+import { InviteStaffDto } from './dto/invite-staff.dto';
+import { StaffService } from './staff.service';
 
 @Controller('staff')
 export class StaffController {
@@ -28,6 +31,16 @@ export class StaffController {
   @ProviderRoles('provider', 'provider_admin')
   invite(@Request() req, @Body() dto: InviteStaffDto) {
     return this.staffService.invite(req.user.id, dto.email, dto.role);
+  }
+
+  /**
+   * GET /staff/invitation/:token — Ver detalles de una invitación antes de aceptar
+   * Solo requiere estar autenticado
+   */
+  @Get('invitation/:token')
+  @UseGuards(AuthGuard('jwt'))
+  getInvitationByToken(@Param('token') token: string) {
+    return this.staffService.getInvitationByToken(token);
   }
 
   /**
@@ -89,7 +102,10 @@ export class StaffController {
   @Delete('members/:userId')
   @UseGuards(PremiumStaffGuard, ProviderRoleGuard)
   @ProviderRoles('provider', 'provider_admin')
-  removeMember(@Request() req, @Param('userId', ParseIntPipe) memberUserId: number) {
+  removeMember(
+    @Request() req,
+    @Param('userId', ParseIntPipe) memberUserId: number,
+  ) {
     return this.staffService.removeMember(req.user.id, memberUserId);
   }
 
@@ -100,7 +116,10 @@ export class StaffController {
   @Delete('invitations/:id')
   @UseGuards(PremiumStaffGuard, ProviderRoleGuard)
   @ProviderRoles('provider', 'provider_admin')
-  cancelInvitation(@Request() req, @Param('id', ParseIntPipe) invitationId: number) {
+  cancelInvitation(
+    @Request() req,
+    @Param('id', ParseIntPipe) invitationId: number,
+  ) {
     return this.staffService.cancelInvitation(req.user.id, invitationId);
   }
 }
