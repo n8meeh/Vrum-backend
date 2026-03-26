@@ -5,6 +5,7 @@ import {
     Get,
     Param,
     ParseIntPipe,
+    Patch,
     Post,
     Request,
     UseGuards,
@@ -93,6 +94,21 @@ export class StaffController {
   @UseGuards(AuthGuard('jwt'))
   leave(@Request() req) {
     return this.staffService.leaveTeam(req.user.id);
+  }
+
+  /**
+   * PATCH /staff/members/:userId/role — Cambiar rol de un miembro
+   * Solo: provider (dueño)
+   */
+  @Patch('members/:userId/role')
+  @UseGuards(PremiumStaffGuard, ProviderRoleGuard)
+  @ProviderRoles('provider')
+  changeRole(
+    @Request() req,
+    @Param('userId', ParseIntPipe) memberUserId: number,
+    @Body('role') role: 'provider_admin' | 'provider_staff',
+  ) {
+    return this.staffService.changeRole(req.user.id, memberUserId, role);
   }
 
   /**

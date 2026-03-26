@@ -324,6 +324,34 @@ export class StaffService {
   }
 
   /**
+   * Cambiar el rol de un miembro del equipo (ascender o degradar)
+   */
+  async changeRole(userId: number, memberUserId: number, newRole: 'provider_admin' | 'provider_staff') {
+    const provider = await this.resolveProviderForUser(userId);
+    if (!provider) throw new ForbiddenException('No tienes un negocio asociado');
+
+    // Solo el dueño puede cambiar roles
+    if (provider.userId !== userId) {
+      throw new ForbiddenException('Solo el dueño del negocio puede cambiar roles.');
+    }
+
+    // No puedes cambiar el rol del dueño
+    if (memberUserId === provider.userId) {
+      throw new ForbiddenException('No puedes cambiar el rol del dueño del negocio.');
+    }
+
+    const member = await this.usersRepo.findOne({
+      where: { id: memberUserId, providerId: provider.id },
+    });
+    if (!member) throw new NotFoundException('Miembro no encontrado en tu equipo.');
+
+    member.role = newRole;
+    await this.usersRepo.save(member);
+
+    return { message: `El rol de ${member.fullName} ha sido actualizado a ${newRole === 'provider_admin' ? 'Administrador' : 'Operador'}.` };
+  }
+
+  /**
    * Eliminar un miembro del equipo
    */
   async removeMember(userId: number, memberUserId: number) {
