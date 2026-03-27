@@ -478,14 +478,14 @@ export class OrdersService {
       ],
       select: {
         id: true,
+        clientId: true,
+        providerId: true,
         title: true,
         description: true,
         status: true,
         finalPrice: true,
         createdAt: true,
         completedAt: true,
-
-        // 👇 AGREGAMOS ESTOS DOS CAMPOS FALTANTES
         isHomeService: true,
         scheduledDate: true,
         isProposal: true,
