@@ -1,18 +1,30 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, ParseIntPipe, Query } from '@nestjs/common';
-import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import {
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    ParseIntPipe,
+    Patch,
+    Post,
+    Query,
+    Request,
+    UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { UpdateTokenDto } from './dto/update-token.dto';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { GroupsService } from '../groups/groups.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateTokenDto } from './dto/update-token.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UsersService } from './users.service';
 
 @Controller('users')
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly groupsService: GroupsService,
-  ) { }
+  ) {}
 
   @UseGuards(AuthGuard('jwt'))
   @Get('following') // GET /users/following (A quién sigo)
@@ -35,7 +47,9 @@ export class UsersController {
   @UseGuards(AuthGuard('jwt'))
   @Patch('push-token')
   updatePushToken(@Request() req, @Body() dto: UpdateTokenDto) {
-    return this.usersService.update(req.user.userId, { fcmToken: dto.token } as any);
+    return this.usersService.update(req.user.userId, {
+      fcmToken: dto.token,
+    } as any);
   }
 
   /** PATCH /users/visibility — proveedor activa/desactiva su visibilidad en el mapa */
@@ -61,7 +75,6 @@ export class UsersController {
     // req.user estará definido SOLO si el guard procesó exitosamente el JWT
     const currentUserId = req.user?.userId;
 
-    
     return this.usersService.findPublicProfile(id, currentUserId);
   }
 
@@ -108,7 +121,10 @@ export class UsersController {
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateUserDto: UpdateUserDto) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
     return this.usersService.update(id, updateUserDto);
   }
 
@@ -138,6 +154,4 @@ export class UsersController {
   getUserGroups(@Param('id', ParseIntPipe) id: number) {
     return this.groupsService.getUserGroups(id);
   }
-
-
 }
