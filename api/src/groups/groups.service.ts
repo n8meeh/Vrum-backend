@@ -31,7 +31,7 @@ export class GroupsService {
   private async getActiveMembersCount(groupId: number): Promise<number> {
     return this.membersRepo
       .createQueryBuilder('m')
-      .innerJoin('m.user', 'u', 'u.deletedAt IS NULL')
+      .innerJoin('m.user', 'u', 'u.deleted_at IS NULL')
       .where('m.groupId = :groupId AND m.status = :status', {
         groupId,
         status: 'active',
@@ -336,11 +336,14 @@ export class GroupsService {
       );
     }
 
+    // Build a map groupId → count to preserve correct indices after filtering
+    const countMap = new Map(groups.map((g, i) => [g.id, counts[i]]));
+
     return groups
       .filter((_, i) => counts[i] > 0)
-      .map((g, i) => ({
+      .map((g) => ({
         ...g,
-        membersCount: counts[i],
+        membersCount: countMap.get(g.id) ?? 0,
         creator: g.creator
           ? {
               id: g.creator.id,

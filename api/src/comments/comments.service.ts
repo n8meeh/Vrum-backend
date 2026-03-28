@@ -1,12 +1,16 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { CreateCommentDto } from './dto/create-comment.dto';
+import {
+    ForbiddenException,
+    Injectable,
+    NotFoundException
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan, In } from 'typeorm';
-import { Comment } from './entities/comment.entity';
-import { User } from '../users/entities/user.entity';
+import { In, MoreThan, Repository } from 'typeorm';
+import { NotificationTriggerService } from '../notifications/notification-trigger.service';
 import { Post } from '../posts/entities/post.entity';
 import { Provider } from '../providers/entities/provider.entity';
-import { NotificationTriggerService } from '../notifications/notification-trigger.service';
+import { User } from '../users/entities/user.entity';
+import { CreateCommentDto } from './dto/create-comment.dto';
+import { Comment } from './entities/comment.entity';
 @Injectable()
 export class CommentsService {
   constructor(
@@ -14,25 +18,30 @@ export class CommentsService {
     private commentsRepository: Repository<Comment>,
     @InjectRepository(Post) private postsRepo: Repository<Post>,
     @InjectRepository(User) private usersRepo: Repository<User>,
-    @InjectRepository(Provider) private providersRepository: Repository<Provider>,
+    @InjectRepository(Provider)
+    private providersRepository: Repository<Provider>,
     private notificationTrigger: NotificationTriggerService,
-  ) { }
+  ) {}
 
   /**
    * Resuelve la identidad de negocio para un conjunto de authorIds.
    * Busca providers tanto para dueños (providers.userId) como para staff (users.providerId).
    */
-  private async resolveProviderIdentities(authorIds: number[]): Promise<Map<number, Provider>> {
+  private async resolveProviderIdentities(
+    authorIds: number[],
+  ): Promise<Map<number, Provider>> {
     if (authorIds.length === 0) return new Map();
 
     // 1. Buscar como dueños
     const ownerProviders = await this.providersRepository.find({
       where: { userId: In(authorIds) },
     });
-    const providerMap = new Map<number, Provider>(ownerProviders.map(p => [p.userId, p]));
+    const providerMap = new Map<number, Provider>(
+      ownerProviders.map((p) => [p.userId, p]),
+    );
 
     // 2. Buscar staff
-    const remainingIds = authorIds.filter(id => !providerMap.has(id));
+    const remainingIds = authorIds.filter((id) => !providerMap.has(id));
     if (remainingIds.length > 0) {
       const staffUsers = await this.usersRepo.find({
         where: { id: In(remainingIds) },
@@ -40,18 +49,21 @@ export class CommentsService {
       });
 
       const staffProviderIds = staffUsers
-        .filter(u => u.providerId !== null)
-        .map(u => u.providerId as number);
+        .filter((u) => u.providerId !== null)
+        .map((u) => u.providerId as number);
 
       if (staffProviderIds.length > 0) {
         const staffProviders = await this.providersRepository.find({
           where: { id: In(staffProviderIds) },
         });
-        const staffProvMap = new Map(staffProviders.map(p => [p.id, p]));
+        const staffProvMap = new Map(staffProviders.map((p) => [p.id, p]));
 
         for (const staffUser of staffUsers) {
           if (staffUser.providerId && staffProvMap.has(staffUser.providerId)) {
-            providerMap.set(staffUser.id, staffProvMap.get(staffUser.providerId)!);
+            providerMap.set(
+              staffUser.id,
+              staffProvMap.get(staffUser.providerId)!,
+            );
           }
         }
       }
@@ -64,10 +76,10 @@ export class CommentsService {
    * Aplica Identidad Dual a un array de comentarios profesionales.
    */
   private async applyDualIdentity(comments: any[]): Promise<void> {
-    const proComments = comments.filter(c => c.isProfessional);
+    const proComments = comments.filter((c) => c.isProfessional);
     if (proComments.length === 0) return;
 
-    const authorIds = [...new Set(proComments.map(c => c.authorId))];
+    const authorIds = [...new Set(proComments.map((c) => c.authorId))];
     const providerMap = await this.resolveProviderIdentities(authorIds);
 
     for (const comment of comments) {
@@ -86,16 +98,19 @@ export class CommentsService {
   }
 
   async create(userId: number, createCommentDto: CreateCommentDto) {
-
     // 1. Resolver provider: como dueño o staff
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     let provider: Provider | null = null;
 
     if (user?.role === 'provider') {
       provider = await this.providersRepository.findOne({ where: { userId } });
-    } else if (['provider_admin', 'provider_staff'].includes(user?.role || '')) {
+    } else if (
+      ['provider_admin', 'provider_staff'].includes(user?.role || '')
+    ) {
       if (user?.providerId) {
-        provider = await this.providersRepository.findOne({ where: { id: user.providerId } });
+        provider = await this.providersRepository.findOne({
+          where: { id: user.providerId },
+        });
       }
     } else {
       provider = await this.providersRepository.findOne({ where: { userId } });
@@ -105,10 +120,14 @@ export class CommentsService {
     if (createCommentDto.isProfessional) {
       const allowedRoles = ['provider', 'provider_admin', 'provider_staff'];
       if (!user || !allowedRoles.includes(user.role)) {
-        throw new ForbiddenException('Solo los miembros de un negocio pueden comentar como profesional.');
+        throw new ForbiddenException(
+          'Solo los miembros de un negocio pueden comentar como profesional.',
+        );
       }
       if (!provider) {
-        throw new ForbiddenException('Tu cuenta no está vinculada a ningún negocio');
+        throw new ForbiddenException(
+          'Tu cuenta no está vinculada a ningún negocio',
+        );
       }
 
       // Límite de 5 comentarios profesionales/mes para proveedores no-premium
@@ -125,20 +144,28 @@ export class CommentsService {
         });
 
         if (proCommentsCount >= 5) {
-          throw new ForbiddenException('Has alcanzado tu límite de 5 comentarios mensuales como negocio. ¡Pásate a Premium para interactuar sin límites!');
+          throw new ForbiddenException(
+            'Has alcanzado tu límite de 5 comentarios mensuales como negocio. ¡Pásate a Premium para interactuar sin límites!',
+          );
         }
       }
     }
 
     // 2. Validar que el post exista
-    const post = await this.postsRepo.findOne({ where: { id: createCommentDto.postId } });
+    const post = await this.postsRepo.findOne({
+      where: { id: createCommentDto.postId },
+    });
     if (!post) {
-      throw new NotFoundException('La publicación ya no existe o fue eliminada');
+      throw new NotFoundException(
+        'La publicación ya no existe o fue eliminada',
+      );
     }
 
     // 2.1. Bloquear comentarios en hilos resueltos
     if (post.isSolved) {
-      throw new ForbiddenException('Este hilo ha sido resuelto y está cerrado para nuevas interacciones.');
+      throw new ForbiddenException(
+        'Este hilo ha sido resuelto y está cerrado para nuevas interacciones.',
+      );
     }
 
     // 3. Mapear correctamente: authorId del DTO o del JWT
@@ -166,7 +193,9 @@ export class CommentsService {
 
     // Transformar autor si es comentario profesional (Identidad Dual)
     if (fullComment && fullComment.isProfessional) {
-      const provMap = await this.resolveProviderIdentities([fullComment.authorId]);
+      const provMap = await this.resolveProviderIdentities([
+        fullComment.authorId,
+      ]);
       const prov = provMap.get(fullComment.authorId);
       if (prov) {
         (fullComment as any).author = {
@@ -179,20 +208,28 @@ export class CommentsService {
     }
 
     // Disparar notificación de comentario (usar nombre de negocio si es profesional)
-    const notifName = (createCommentDto.isProfessional && provider)
-      ? provider.businessName
-      : undefined;
-    this.notificationTrigger.onComment(authorId, post.id, post.authorId, notifName).catch(() => {});
+    const notifName =
+      createCommentDto.isProfessional && provider
+        ? provider.businessName
+        : undefined;
+    this.notificationTrigger
+      .onComment(authorId, post.id, post.authorId, notifName, post.groupId)
+      .catch(() => {});
 
     return fullComment || saved;
   }
 
   // Editar Comentario
   async updateComment(commentId: number, userId: number, content: string) {
-    const comment = await this.commentsRepository.findOne({ where: { id: commentId } });
+    const comment = await this.commentsRepository.findOne({
+      where: { id: commentId },
+    });
 
     if (!comment) throw new NotFoundException('Comentario no encontrado');
-    if (comment.authorId !== userId) throw new ForbiddenException('Solo puedes modificar tus propios comentarios');
+    if (comment.authorId !== userId)
+      throw new ForbiddenException(
+        'Solo puedes modificar tus propios comentarios',
+      );
 
     comment.content = content;
     return await this.commentsRepository.save(comment);
@@ -200,10 +237,15 @@ export class CommentsService {
 
   // Eliminar Comentario
   async removeComment(commentId: number, userId: number) {
-    const comment = await this.commentsRepository.findOne({ where: { id: commentId } });
+    const comment = await this.commentsRepository.findOne({
+      where: { id: commentId },
+    });
 
     if (!comment) throw new NotFoundException('Comentario no encontrado');
-    if (comment.authorId !== userId) throw new ForbiddenException('Solo puedes modificar tus propios comentarios');
+    if (comment.authorId !== userId)
+      throw new ForbiddenException(
+        'Solo puedes modificar tus propios comentarios',
+      );
 
     const postId = comment.postId;
 
@@ -220,7 +262,7 @@ export class CommentsService {
     // 1. Buscamos el comentario con la relación al post
     const comment = await this.commentsRepository.findOne({
       where: { id: commentId },
-      relations: ['post']
+      relations: ['post'],
     });
 
     if (!comment) throw new NotFoundException('Comentario no encontrado');
@@ -228,13 +270,16 @@ export class CommentsService {
     // 2. SEGURIDAD: Solo el autor del post puede marcar/desmarcar la solución
 
     if (Number(comment.post.authorId) !== Number(userId)) {
-      throw new ForbiddenException('Solo el autor de la publicación puede marcar soluciones');
+      throw new ForbiddenException(
+        'Solo el autor de la publicación puede marcar soluciones',
+      );
     }
 
     // 3. TOGGLE LOGIC
 
     // Verificar si el autor del post es el mismo que el autor del comentario (anti-farmeo)
-    const isSelfAnswer = Number(comment.post.authorId) === Number(comment.authorId);
+    const isSelfAnswer =
+      Number(comment.post.authorId) === Number(comment.authorId);
 
     // CASO A: Si ya es solución, DESMARCAR
     if (comment.isSolution) {
@@ -246,7 +291,11 @@ export class CommentsService {
 
       // Restar puntos SOLO si NO es auto-respuesta (anti-farmeo)
       if (!isSelfAnswer) {
-        await this.usersRepo.decrement({ id: comment.authorId }, 'solutionsCount', 1);
+        await this.usersRepo.decrement(
+          { id: comment.authorId },
+          'solutionsCount',
+          1,
+        );
       }
 
       return { success: true, message: 'Solución desmarcada' };
@@ -258,8 +307,8 @@ export class CommentsService {
     const previousSolution = await this.commentsRepository.findOne({
       where: {
         postId: comment.postId,
-        isSolution: true
-      }
+        isSolution: true,
+      },
     });
 
     // B.2. Si existe otra solución, desmarcrarla y restar puntos
@@ -268,9 +317,14 @@ export class CommentsService {
       await this.commentsRepository.save(previousSolution);
 
       // Restar puntos SOLO si la solución previa NO era auto-respuesta
-      const wasPreviousSelfAnswer = Number(comment.post.authorId) === Number(previousSolution.authorId);
+      const wasPreviousSelfAnswer =
+        Number(comment.post.authorId) === Number(previousSolution.authorId);
       if (!wasPreviousSelfAnswer) {
-        await this.usersRepo.decrement({ id: previousSolution.authorId }, 'solutionsCount', 1);
+        await this.usersRepo.decrement(
+          { id: previousSolution.authorId },
+          'solutionsCount',
+          1,
+        );
       }
     }
 
@@ -283,11 +337,17 @@ export class CommentsService {
 
     // B.5. Dar puntos de gamificación SOLO si NO es auto-respuesta (anti-farmeo)
     if (!isSelfAnswer) {
-      await this.usersRepo.increment({ id: comment.authorId }, 'solutionsCount', 1);
+      await this.usersRepo.increment(
+        { id: comment.authorId },
+        'solutionsCount',
+        1,
+      );
     }
 
     // Disparar notificación de solución marcada
-    this.notificationTrigger.onSolutionMarked(userId, comment.authorId, comment.post.id).catch(() => {});
+    this.notificationTrigger
+      .onSolutionMarked(userId, comment.authorId, comment.post.id)
+      .catch(() => {});
 
     const message = isSelfAnswer
       ? 'Solución marcada (sin puntos por auto-respuesta)'
@@ -309,10 +369,10 @@ export class CommentsService {
           id: true,
           fullName: true,
           avatarUrl: true,
-          role: true
-        }
+          role: true,
+        },
       },
-      order: { createdAt: 'ASC' }
+      order: { createdAt: 'ASC' },
     });
 
     // Transformar autor para comentarios profesionales (Identidad Dual)
@@ -327,8 +387,8 @@ export class CommentsService {
       relations: ['author'],
       order: {
         isSolution: 'DESC',
-        createdAt: 'ASC'
-      }
+        createdAt: 'ASC',
+      },
     });
 
     // Transformar autor para comentarios profesionales (Identidad Dual)

@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GroupMember } from '../groups/entities/group-member.entity';
 import { NegotiationsGateway } from '../negotiations/negotiations.gateway';
-import { Post } from '../posts/entities/post.entity';
 import { User } from '../users/entities/user.entity';
 import { NotificationsService } from './notifications.service';
 
@@ -15,24 +14,18 @@ export class NotificationTriggerService {
     private usersRepo: Repository<User>,
     @InjectRepository(GroupMember)
     private groupMemberRepo: Repository<GroupMember>,
-    @InjectRepository(Post)
-    private postsRepo: Repository<Post>,
     @Inject(forwardRef(() => NegotiationsGateway))
     private gateway: NegotiationsGateway,
   ) {}
 
-  /** Returns false if the post belongs to a group and the user is no longer an active member */
+  /** Returns false if post belongs to a group and the author is no longer an active member */
   private async isActiveInPostGroup(
-    postId: number,
+    groupId: number | null,
     userId: number,
   ): Promise<boolean> {
-    const post = await this.postsRepo.findOne({
-      where: { id: postId },
-      select: ['id', 'groupId'],
-    });
-    if (!post?.groupId) return true; // not a group post — always notify
+    if (!groupId) return true;
     const membership = await this.groupMemberRepo.findOne({
-      where: { groupId: post.groupId, userId, status: 'active' },
+      where: { groupId, userId, status: 'active' },
     });
     return membership != null;
   }
@@ -78,10 +71,12 @@ export class NotificationTriggerService {
     likerId: number,
     postId: number,
     postAuthorId: number,
+    groupId?: number | null,
   ): Promise<void> {
     if (likerId === postAuthorId) return;
 
-    if (!(await this.isActiveInPostGroup(postId, postAuthorId))) return;
+    if (!(await this.isActiveInPostGroup(groupId ?? null, postAuthorId)))
+      return;
 
     const liker = await this.usersRepo.findOne({ where: { id: likerId } });
     if (!liker) return;
@@ -119,10 +114,12 @@ export class NotificationTriggerService {
     postId: number,
     postAuthorId: number,
     displayName?: string,
+    groupId?: number | null,
   ): Promise<void> {
     if (commenterId === postAuthorId) return;
 
-    if (!(await this.isActiveInPostGroup(postId, postAuthorId))) return;
+    if (!(await this.isActiveInPostGroup(groupId ?? null, postAuthorId)))
+      return;
 
     if (!displayName) {
       const commenter = await this.usersRepo.findOne({
