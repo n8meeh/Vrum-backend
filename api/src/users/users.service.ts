@@ -1,16 +1,22 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import {
+    BadRequestException,
+    Injectable,
+    Logger,
+    NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan, IsNull, In, LessThan, Like } from 'typeorm';
-import { User } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
-import { UserBlock } from './entities/user-block.entity';
-import { UserFollow } from './entities/user-follow.entity';
-import { Vehicle } from '../vehicles/entities/vehicle.entity';
+import { In, IsNull, Like, MoreThan, Repository } from 'typeorm';
+import { GroupsService } from '../groups/groups.service';
+import { NotificationTriggerService } from '../notifications/notification-trigger.service';
 import { Post } from '../posts/entities/post.entity';
 import { Provider } from '../providers/entities/provider.entity';
-import { NotificationTriggerService } from '../notifications/notification-trigger.service';
+import { Vehicle } from '../vehicles/entities/vehicle.entity';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UserBlock } from './entities/user-block.entity';
+import { UserFollow } from './entities/user-follow.entity';
+import { User } from './entities/user.entity';
 
 @Injectable()
 export class UsersService {
@@ -22,7 +28,8 @@ export class UsersService {
     @InjectRepository(Post) private postRepo: Repository<Post>,
     @InjectRepository(Provider) private providerRepo: Repository<Provider>,
     private notificationTrigger: NotificationTriggerService,
-  ) { }
+    private groupsService: GroupsService,
+  ) {}
 
   /**
    * Toggle de Bloqueo: Bloquea si no está bloqueado, desbloquea si ya lo está
@@ -33,12 +40,14 @@ export class UsersService {
     }
 
     // Verificar si el usuario objetivo existe
-    const targetUser = await this.usersRepository.findOne({ where: { id: blockedId } });
+    const targetUser = await this.usersRepository.findOne({
+      where: { id: blockedId },
+    });
     if (!targetUser) throw new NotFoundException('Usuario no encontrado');
 
     // Buscar si ya existe un bloqueo
     const existingBlock = await this.blockRepo.findOne({
-      where: { blockerId, blockedId }
+      where: { blockerId, blockedId },
     });
 
     if (existingBlock) {
@@ -46,7 +55,7 @@ export class UsersService {
       await this.blockRepo.remove(existingBlock);
       return {
         status: 'unblocked',
-        message: `Has desbloqueado a ${targetUser.fullName}`
+        message: `Has desbloqueado a ${targetUser.fullName}`,
       };
     } else {
       // No está bloqueado → BLOQUEAR
@@ -54,7 +63,7 @@ export class UsersService {
       await this.blockRepo.save(newBlock);
       return {
         status: 'blocked',
-        message: `Has bloqueado a ${targetUser.fullName}`
+        message: `Has bloqueado a ${targetUser.fullName}`,
       };
     }
   }
@@ -62,7 +71,7 @@ export class UsersService {
   async saveResetToken(userId: number, token: string, expires: Date) {
     return this.usersRepository.update(userId, {
       resetPasswordToken: token,
-      resetPasswordExpires: expires
+      resetPasswordExpires: expires,
     });
   }
 
@@ -72,7 +81,7 @@ export class UsersService {
       where: {
         resetPasswordToken: token,
         resetPasswordExpires: MoreThan(new Date()),
-      }
+      },
     });
   }
 
@@ -83,7 +92,7 @@ export class UsersService {
         email,
         resetPasswordToken: code,
         resetPasswordExpires: MoreThan(new Date()),
-      }
+      },
     });
   }
 
@@ -93,7 +102,7 @@ export class UsersService {
       password: hashedPassword,
       // Gracias al cambio en el Paso 1, esto ya no dará error rojo
       resetPasswordToken: null,
-      resetPasswordExpires: null
+      resetPasswordExpires: null,
     });
   }
   /**
@@ -101,14 +110,20 @@ export class UsersService {
    * @param userId ID del usuario
    * @param newRole Nuevo rol (user, provider, admin)
    */
-  async updateRole(userId: number, newRole: 'user' | 'provider' | 'provider_admin' | 'provider_staff' | 'admin') {
+  async updateRole(
+    userId: number,
+    newRole:
+      | 'user'
+      | 'provider'
+      | 'provider_admin'
+      | 'provider_staff'
+      | 'admin',
+  ) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('Usuario no encontrado');
 
-
     user.role = newRole;
     const updatedUser = await this.usersRepository.save(user);
-
 
     return updatedUser;
   }
@@ -130,12 +145,23 @@ export class UsersService {
 
     // Si el usuario es provider, desactivar su negocio
     if (user.role === 'provider') {
-      const provider = await this.providerRepo.findOne({ where: { userId: id } });
+      const provider = await this.providerRepo.findOne({
+        where: { userId: id },
+      });
       if (provider) {
         provider.isVisible = false;
         await this.providerRepo.save(provider);
       }
     }
+
+    // Manejar los grupos donde el usuario es creador: transferir o cerrar
+    const creatorGroups = await this.groupsService.findGroupsCreatedBy(id);
+    for (const group of creatorGroups) {
+      await this.groupsService.closeGroup(group.id, id);
+    }
+
+    // Eliminar al usuario de todos los grupos donde es miembro (no creador)
+    await this.groupsService.removeUserFromAllGroups(id);
 
     user.deletedAt = new Date();
     user.isVisible = false;
@@ -149,8 +175,6 @@ export class UsersService {
 
     return await this.usersRepository.save(user);
   }
-
-
 
   /**
    * Obtener perfil completo del usuario con contadores sociales
@@ -179,28 +203,28 @@ export class UsersService {
         staffProvider: {
           id: true,
           businessName: true,
-        }
-      }
+        },
+      },
     });
 
     if (!user) throw new NotFoundException('Usuario no encontrado');
 
     // ➕ Contar seguidores (quiénes me siguen)
     const followersCount = await this.followRepo.count({
-      where: { followedId: id }
+      where: { followedId: id },
     });
 
     // ➕ Contar seguidos (a quiénes sigo)
     const followingCount = await this.followRepo.count({
-      where: { followerId: id }
+      where: { followerId: id },
     });
 
     // ➕ Contar publicaciones activas
     const postsCount = await this.postRepo.count({
       where: {
         authorId: id,
-        status: 'active'
-      }
+        status: 'active',
+      },
     });
 
     // Para staff: unificar provider para que el frontend siempre use user.provider
@@ -210,7 +234,7 @@ export class UsersService {
       strikesCount: user.strikesCount || 0,
       followersCount,
       followingCount,
-      postsCount
+      postsCount,
     };
 
     // Si es staff y no tiene provider (dueño), usar staffProvider como provider
@@ -243,8 +267,8 @@ export class UsersService {
           id: true,
           businessName: true,
           ratingAvg: true,
-        }
-      }
+        },
+      },
     });
 
     if (!user) throw new NotFoundException('Usuario no encontrado');
@@ -253,7 +277,7 @@ export class UsersService {
     const vehicles = await this.vehicleRepo.find({
       where: {
         userId: id,
-        deletedAt: IsNull()
+        deletedAt: IsNull(),
       },
       relations: ['vehicleType'],
       select: {
@@ -271,19 +295,19 @@ export class UsersService {
         vehicleType: {
           id: true,
           name: true,
-        }
+        },
       },
-      order: { id: 'DESC' }
+      order: { id: 'DESC' },
     });
 
     // 2. Contar seguidores (quienes siguen a este usuario)
     const followersCount = await this.followRepo.count({
-      where: { followedId: id }
+      where: { followedId: id },
     });
 
     // 3. Contar seguidos (a quienes sigue este usuario)
     const followingCount = await this.followRepo.count({
-      where: { followerId: id }
+      where: { followerId: id },
     });
 
     // 4. Verificar si el usuario actual lo está siguiendo
@@ -297,15 +321,14 @@ export class UsersService {
     const profileIdNum = Number(id);
 
     if (userIdNum && !isNaN(userIdNum) && userIdNum !== profileIdNum) {
-
       // Buscar relación de seguimiento usando count() para mayor confiabilidad
       // followerId = quien sigue (currentUser)
       // followedId = quien es seguido (profile)
       const followCount = await this.followRepo.count({
         where: {
           followerId: userIdNum,
-          followedId: profileIdNum
-        }
+          followedId: profileIdNum,
+        },
       });
 
       isFollowing = followCount > 0;
@@ -314,13 +337,17 @@ export class UsersService {
       const blockCount = await this.blockRepo.count({
         where: {
           blockerId: userIdNum,
-          blockedId: profileIdNum
-        }
+          blockedId: profileIdNum,
+        },
       });
       isBlocked = blockCount > 0;
     } else {
-      console.log(`⚠️ [PUBLIC_PROFILE] Sin autenticación, mismo usuario, o IDs inválidos - isFollowing = false`);
-      console.log(`   Razón: userIdNum=${userIdNum}, isNaN=${userIdNum ? isNaN(userIdNum) : 'N/A'}, sonIguales=${userIdNum === profileIdNum}`);
+      console.log(
+        `⚠️ [PUBLIC_PROFILE] Sin autenticación, mismo usuario, o IDs inválidos - isFollowing = false`,
+      );
+      console.log(
+        `   Razón: userIdNum=${userIdNum}, isNaN=${userIdNum ? isNaN(userIdNum) : 'N/A'}, sonIguales=${userIdNum === profileIdNum}`,
+      );
     }
 
     return {
@@ -329,21 +356,33 @@ export class UsersService {
       followersCount,
       followingCount,
       isFollowing,
-      isBlocked
+      isBlocked,
     };
   }
 
   async findByEmail(email: string) {
     return this.usersRepository.findOne({
       where: { email },
-      select: ['id', 'email', 'password', 'role', 'fullName', 'fcmToken', 'providerId']
+      select: [
+        'id',
+        'email',
+        'password',
+        'role',
+        'fullName',
+        'fcmToken',
+        'providerId',
+      ],
     });
   }
 
   /**
    * Vincula un usuario como staff a un negocio
    */
-  async linkToProvider(userId: number, providerId: number, role: 'provider_admin' | 'provider_staff') {
+  async linkToProvider(
+    userId: number,
+    providerId: number,
+    role: 'provider_admin' | 'provider_staff',
+  ) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('Usuario no encontrado');
 
@@ -393,14 +432,18 @@ export class UsersService {
       .createQueryBuilder()
       .update(User)
       .set({ isVisible: false })
-      .where('role IN (:...roles)', { roles: ['provider', 'provider_admin', 'provider_staff'] })
+      .where('role IN (:...roles)', {
+        roles: ['provider', 'provider_admin', 'provider_staff'],
+      })
       .andWhere('last_login_at < :cutoff', { cutoff })
       .andWhere('is_visible = :visible', { visible: true })
       .execute();
 
     const count = result.affected ?? 0;
     if (count > 0) {
-      logger.log(`Auto-ocultados ${count} proveedor(es) por inactividad (>14 días).`);
+      logger.log(
+        `Auto-ocultados ${count} proveedor(es) por inactividad (>14 días).`,
+      );
     }
     return count;
   }
@@ -410,15 +453,29 @@ export class UsersService {
    * Selecciona explícitamente current_session_token (campo con select:false),
    * además de role y provider_id para que reflejen cambios en tiempo real.
    */
-  async findByIdForSession(id: number): Promise<{ id: number; currentSessionToken: string | null; role: string; providerId: number | null; bannedUntil: Date | null } | null> {
+  async findByIdForSession(id: number): Promise<{
+    id: number;
+    currentSessionToken: string | null;
+    role: string;
+    providerId: number | null;
+    bannedUntil: Date | null;
+  } | null> {
     return this.usersRepository
       .createQueryBuilder('user')
-      .select(['user.id', 'user.currentSessionToken', 'user.role', 'user.providerId', 'user.bannedUntil'])
+      .select([
+        'user.id',
+        'user.currentSessionToken',
+        'user.role',
+        'user.providerId',
+        'user.bannedUntil',
+      ])
       .where('user.id = :id', { id })
       .getOne();
   }
 
-  findAll() { return this.usersRepository.find(); }
+  findAll() {
+    return this.usersRepository.find();
+  }
 
   async update(id: number, updateUserDto: UpdateUserDto) {
     // 1. Si viene password, hashearlo
@@ -430,11 +487,13 @@ export class UsersService {
     // 2. Si viene email, verificar duplicados
     if (updateUserDto.email) {
       const existingUser = await this.usersRepository.findOne({
-        where: { email: updateUserDto.email }
+        where: { email: updateUserDto.email },
       });
       // Si existe y NO es el mismo usuario que está editando
       if (existingUser && existingUser.id !== id) {
-        throw new BadRequestException('El email ya está en uso por otro usuario');
+        throw new BadRequestException(
+          'El email ya está en uso por otro usuario',
+        );
       }
     }
 
@@ -445,29 +504,36 @@ export class UsersService {
   }
 
   async toggleFollow(followerId: number, followedId: number) {
-
     if (followerId === followedId) {
       throw new BadRequestException('No puedes seguirte a ti mismo');
     }
 
-    const targetUser = await this.usersRepository.findOne({ where: { id: followedId } });
+    const targetUser = await this.usersRepository.findOne({
+      where: { id: followedId },
+    });
     if (!targetUser) throw new NotFoundException('Usuario no encontrado');
 
     const existingFollow = await this.followRepo.findOne({
-      where: { followerId, followedId }
+      where: { followerId, followedId },
     });
 
     if (existingFollow) {
       await this.followRepo.remove(existingFollow);
-      return { status: 'unfollowed', message: `Dejaste de seguir a ${targetUser.fullName}` };
+      return {
+        status: 'unfollowed',
+        message: `Dejaste de seguir a ${targetUser.fullName}`,
+      };
     } else {
       const newFollow = this.followRepo.create({ followerId, followedId });
       await this.followRepo.save(newFollow);
 
       // Disparar notificación de follow
-      this.notificationTrigger.onFollow(followerId, followedId).catch(() => { });
+      this.notificationTrigger.onFollow(followerId, followedId).catch(() => {});
 
-      return { status: 'followed', message: `Ahora sigues a ${targetUser.fullName}` };
+      return {
+        status: 'followed',
+        message: `Ahora sigues a ${targetUser.fullName}`,
+      };
     }
   }
 
@@ -477,19 +543,21 @@ export class UsersService {
   async getFollowing(userId: number) {
     const follows = await this.followRepo.find({
       where: { followerId: userId },
-      relations: ['followed', 'followed.provider']
+      relations: ['followed', 'followed.provider'],
     });
 
-    return follows.map(follow => ({
+    return follows.map((follow) => ({
       id: follow.followed.id,
       fullName: follow.followed.fullName,
       avatarUrl: follow.followed.avatarUrl,
       role: follow.followed.role,
       bio: follow.followed.bio,
-      provider: follow.followed.provider ? {
-        id: follow.followed.provider.id,
-        businessName: follow.followed.provider.businessName,
-      } : null
+      provider: follow.followed.provider
+        ? {
+            id: follow.followed.provider.id,
+            businessName: follow.followed.provider.businessName,
+          }
+        : null,
     }));
   }
 
@@ -499,19 +567,21 @@ export class UsersService {
   async getFollowers(userId: number) {
     const follows = await this.followRepo.find({
       where: { followedId: userId },
-      relations: ['follower', 'follower.provider']
+      relations: ['follower', 'follower.provider'],
     });
 
-    return follows.map(follow => ({
+    return follows.map((follow) => ({
       id: follow.follower.id,
       fullName: follow.follower.fullName,
       avatarUrl: follow.follower.avatarUrl,
       role: follow.follower.role,
       bio: follow.follower.bio,
-      provider: follow.follower.provider ? {
-        id: follow.follower.provider.id,
-        businessName: follow.follower.provider.businessName,
-      } : null
+      provider: follow.follower.provider
+        ? {
+            id: follow.follower.provider.id,
+            businessName: follow.follower.provider.businessName,
+          }
+        : null,
     }));
   }
 
@@ -524,7 +594,7 @@ export class UsersService {
     }
 
     const blocks = await this.blockRepo.find({
-      where: { blockerId: userId }
+      where: { blockerId: userId },
     });
 
     if (blocks.length === 0) {
@@ -532,7 +602,7 @@ export class UsersService {
     }
 
     // Obtener los IDs de los usuarios bloqueados
-    const blockedIds = blocks.map(block => block.blockedId);
+    const blockedIds = blocks.map((block) => block.blockedId);
 
     // Buscar la información de esos usuarios
     const blockedUsers = await this.usersRepository.find({
@@ -547,20 +617,22 @@ export class UsersService {
         provider: {
           id: true,
           businessName: true,
-        }
-      }
+        },
+      },
     });
 
-    return blockedUsers.map(user => ({
+    return blockedUsers.map((user) => ({
       id: user.id,
       fullName: user.fullName,
       avatarUrl: user.avatarUrl,
       role: user.role,
       bio: user.bio,
-      provider: user.provider ? {
-        id: user.provider.id,
-        businessName: user.provider.businessName,
-      } : null
+      provider: user.provider
+        ? {
+            id: user.provider.id,
+            businessName: user.provider.businessName,
+          }
+        : null,
     }));
   }
 

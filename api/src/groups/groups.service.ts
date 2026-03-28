@@ -5,7 +5,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { NotificationTriggerService } from '../notifications/notification-trigger.service';
 import { Post } from '../posts/entities/post.entity';
 import { User } from '../users/entities/user.entity';
@@ -134,6 +134,27 @@ export class GroupsService {
     Object.assign(group, dto);
     await this.groupsRepo.save(group);
     return this.findOne(groupId, userId);
+  }
+
+  async findGroupsCreatedBy(userId: number): Promise<{ id: number }[]> {
+    return this.groupsRepo.find({
+      where: { creatorId: userId, isActive: true },
+      select: ['id'],
+    });
+  }
+
+  async removeUserFromAllGroups(userId: number): Promise<void> {
+    const memberships = await this.membersRepo.find({
+      where: { userId, status: 'active' },
+    });
+    for (const membership of memberships) {
+      await this.membersRepo.remove(membership);
+      await this.groupsRepo.decrement(
+        { id: membership.groupId, membersCount: MoreThan(0) },
+        'membersCount',
+        1,
+      );
+    }
   }
 
   async closeGroup(
