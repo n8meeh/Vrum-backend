@@ -26,6 +26,19 @@ export class GroupsService {
     private notificationTrigger: NotificationTriggerService,
   ) {}
 
+  // ==================== HELPERS ====================
+
+  private async getActiveMembersCount(groupId: number): Promise<number> {
+    return this.membersRepo
+      .createQueryBuilder('m')
+      .innerJoin('m.user', 'u', 'u.deletedAt IS NULL')
+      .where('m.groupId = :groupId AND m.status = :status', {
+        groupId,
+        status: 'active',
+      })
+      .getCount();
+  }
+
   // ==================== GRUPOS CRUD ====================
 
   async create(userId: number, dto: CreateGroupDto): Promise<Group> {
@@ -83,6 +96,9 @@ export class GroupsService {
             fullName: 'Usuario Eliminado',
             avatarUrl: null,
           },
+      membersCount: group.members.filter(
+        (m) => m.status === 'active' && m.user != null,
+      ).length,
       members: group.members
         .filter((m) => m.status === 'active' && m.user != null)
         .map((m) => ({
@@ -214,28 +230,30 @@ export class GroupsService {
       relations: ['group', 'group.creator'],
     });
 
-    return memberships
-      .filter((m) => m.group.isActive)
-      .map((m) => ({
-        id: m.group.id,
-        name: m.group.name,
-        description: m.group.description,
-        imageUrl: m.group.imageUrl,
-        isPublic: m.group.isPublic,
-        membersCount: m.group.membersCount,
-        myRole: m.role,
-        creator: m.group.creator
-          ? {
-              id: m.group.creator.id,
-              fullName: m.group.creator.fullName,
-              avatarUrl: m.group.creator.avatarUrl,
-            }
-          : {
-              id: m.group.creatorId,
-              fullName: 'Usuario Eliminado',
-              avatarUrl: null,
-            },
-      }));
+    const activeList = memberships.filter((m) => m.group.isActive);
+    const counts = await Promise.all(
+      activeList.map((m) => this.getActiveMembersCount(m.group.id)),
+    );
+    return activeList.map((m, i) => ({
+      id: m.group.id,
+      name: m.group.name,
+      description: m.group.description,
+      imageUrl: m.group.imageUrl,
+      isPublic: m.group.isPublic,
+      membersCount: counts[i],
+      myRole: m.role,
+      creator: m.group.creator
+        ? {
+            id: m.group.creator.id,
+            fullName: m.group.creator.fullName,
+            avatarUrl: m.group.creator.avatarUrl,
+          }
+        : {
+            id: m.group.creatorId,
+            fullName: 'Usuario Eliminado',
+            avatarUrl: null,
+          },
+    }));
   }
 
   async findMyGroups(userId: number): Promise<any[]> {
@@ -259,8 +277,13 @@ export class GroupsService {
       pendingCounts.set(gId, count);
     }
 
-    return activeGroups.map((m) => ({
+    const activeCounts = await Promise.all(
+      activeGroups.map((m) => this.getActiveMembersCount(m.group.id)),
+    );
+
+    return activeGroups.map((m, i) => ({
       ...m.group,
+      membersCount: activeCounts[i],
       myRole: m.role,
       creator: m.group.creator
         ? {
@@ -295,8 +318,13 @@ export class GroupsService {
       memberships.forEach((m) => myMemberships.set(m.groupId, m.status));
     }
 
-    return groups.map((g) => ({
+    const counts = await Promise.all(
+      groups.map((g) => this.getActiveMembersCount(g.id)),
+    );
+
+    return groups.map((g, i) => ({
       ...g,
+      membersCount: counts[i],
       creator: g.creator
         ? {
             id: g.creator.id,
