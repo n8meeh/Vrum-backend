@@ -421,11 +421,16 @@ export class GroupsService {
     });
     if (!member) throw new NotFoundException('Miembro no encontrado');
 
-    // Solo se pueden expulsar miembros sin rol especial
-    if (member.role !== 'member') {
+    // Solo el creador puede expulsar a admins
+    if (member.role === 'admin' && adminId !== group.creatorId) {
       throw new ForbiddenException(
-        'Solo puedes expulsar a miembros sin rol especial',
+        'Solo el creador puede expulsar a un administrador',
       );
+    }
+
+    // Nadie puede expulsar a otro creador
+    if (member.role === 'creator') {
+      throw new ForbiddenException('No puedes expulsar al creador del grupo');
     }
 
     member.status = 'banned';
