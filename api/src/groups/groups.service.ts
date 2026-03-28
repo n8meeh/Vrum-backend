@@ -276,23 +276,17 @@ export class GroupsService {
         throw new BadRequestException('Ya eres miembro de este grupo');
       if (existing.status === 'pending')
         throw new BadRequestException('Ya tienes una solicitud pendiente');
+      if (existing.status === 'banned')
+        throw new ForbiddenException('Has sido expulsado de este grupo');
     }
 
     const status = group.isPublic ? 'active' : 'pending';
-
-    if (existing) {
-      // Reutilizar el registro existente (puede ser 'banned' u otro estado)
-      existing.role = 'member';
-      existing.status = status;
-      await this.membersRepo.save(existing);
-    } else {
-      await this.membersRepo.save({
-        groupId,
-        userId,
-        role: 'member',
-        status,
-      });
-    }
+    await this.membersRepo.save({
+      groupId,
+      userId,
+      role: 'member',
+      status,
+    });
 
     if (status === 'active') {
       group.membersCount = (group.membersCount || 0) + 1;
