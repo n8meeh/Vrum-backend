@@ -88,16 +88,15 @@ export class ReportsService {
             throw new BadRequestException('Ya tienes un reporte pendiente para este contenido.');
         }
 
-        // Validación de interacción para reportes de tipo "provider" con razones graves
-        if (dto.contentType === 'provider' && (dto.reason === 'scam' || dto.reason === 'other')) {
-            const provider = await this.providerRepo.findOne({ where: { id: dto.contentId } });
-            if (provider) {
-                const hasChat = await this.hasInteraction(reporterId, provider.id);
-                if (!hasChat) {
-                    throw new BadRequestException(
-                        'Solo puedes reportar un negocio si has tenido una interacción previa (chat/solicitud).',
-                    );
-                }
+        // Validación: para reportar un negocio se debe tener al menos una orden con él (en cualquier estado)
+        if (dto.contentType === 'provider') {
+            const hasOrder = await this.orderRepo.count({
+                where: { clientId: reporterId, providerId: dto.contentId },
+            });
+            if (!hasOrder) {
+                throw new BadRequestException(
+                    'Solo puedes reportar un negocio si has tenido al menos una solicitud u orden con él.',
+                );
             }
         }
 

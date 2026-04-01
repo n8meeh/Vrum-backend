@@ -50,8 +50,12 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document); // 'docs' será la URL (localhost:3000/docs)
   // 👆 FIN CONFIGURACIÓN SWAGGER
 
-  // Habilitar CORS para que tu React Native / Frontend pueda conectarse
-  app.enableCors();
+  // Habilitar CORS solo para orígenes autorizados
+  app.enableCors({
+    origin: ['https://brumh.cl', 'https://www.brumh.cl'],
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
 
   await app.listen(3000);
   logger.log(`App running on port 3000`);
