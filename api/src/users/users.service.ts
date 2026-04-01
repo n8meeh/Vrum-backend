@@ -549,10 +549,13 @@ export class UsersService {
    * Obtener la lista de usuarios que este usuario sigue
    */
   async getFollowing(userId: number) {
-    const follows = await this.followRepo.find({
-      where: { followerId: userId },
-      relations: ['followed', 'followed.provider'],
-    });
+    const follows = await this.followRepo
+      .createQueryBuilder('f')
+      .innerJoinAndSelect('f.followed', 'followed')
+      .leftJoinAndSelect('followed.provider', 'provider')
+      .where('f.followerId = :userId', { userId })
+      .andWhere('followed.deletedAt IS NULL')
+      .getMany();
 
     return follows.map((follow) => ({
       id: follow.followed.id,
@@ -573,10 +576,13 @@ export class UsersService {
    * Obtener la lista de usuarios que siguen a este usuario (seguidores)
    */
   async getFollowers(userId: number) {
-    const follows = await this.followRepo.find({
-      where: { followedId: userId },
-      relations: ['follower', 'follower.provider'],
-    });
+    const follows = await this.followRepo
+      .createQueryBuilder('f')
+      .innerJoinAndSelect('f.follower', 'follower')
+      .leftJoinAndSelect('follower.provider', 'provider')
+      .where('f.followedId = :userId', { userId })
+      .andWhere('follower.deletedAt IS NULL')
+      .getMany();
 
     return follows.map((follow) => ({
       id: follow.follower.id,
