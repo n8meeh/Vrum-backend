@@ -408,20 +408,24 @@ export class CommentsService {
       order: { createdAt: 'DESC' },
     });
 
-    return comments.map((c) => ({
-      commentId: c.id,
-      content: c.content,
-      createdAt: c.createdAt,
-      post: {
-        id: c.post.id,
-        content: c.post.content,
-        createdAt: c.post.createdAt,
-        author: {
-          id: c.post.author?.id,
-          fullName: c.post.author?.fullName,
-          avatarUrl: c.post.author?.avatarUrl,
+    return comments
+      .filter((c) => c.post != null)
+      .map((c) => ({
+        commentId: c.id,
+        content: c.content,
+        createdAt: c.createdAt,
+        post: {
+          id: c.post.id,
+          content: c.post.content,
+          createdAt: c.post.createdAt,
+          author: c.post.author
+            ? {
+                id: c.post.author.id,
+                fullName: c.post.author.fullName,
+                avatarUrl: c.post.author.avatarUrl,
+              }
+            : null,
         },
-      },
-    }));
+      }));
   }
 }
