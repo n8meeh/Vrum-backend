@@ -114,9 +114,9 @@ export class SubscriptionsService {
       throw new BadRequestException('Necesitas tener un negocio registrado para activar la prueba gratuita');
     }
 
-    // 2. Verificar que no haya tenido trial/premium antes (por provider)
+    // 2. Verificar que no tenga una suscripción activa (trial o premium)
     const existingSub = await this.subscriptionsRepository.findOne({
-      where: { providerId: provider.id },
+      where: { providerId: provider.id, status: 'active' },
     });
     if (existingSub) {
       throw new ConflictException('Ya utilizaste tu período de prueba gratuito o ya tienes una suscripción activa');
