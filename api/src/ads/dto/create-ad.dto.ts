@@ -1,4 +1,4 @@
-import { IsBoolean, IsDateString, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 
 export class CreateAdDto {
   @IsString()
@@ -22,11 +22,11 @@ export class CreateAdDto {
   @IsBoolean()
   isActive?: boolean;
 
-  @IsOptional()
+  @ValidateIf((o) => o.startDate !== null && o.startDate !== undefined)
   @IsDateString()
-  startDate?: string;
+  startDate?: string | null;
 
-  @IsOptional()
+  @ValidateIf((o) => o.endDate !== null && o.endDate !== undefined)
   @IsDateString()
-  endDate?: string;
+  endDate?: string | null;
 }
