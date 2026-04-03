@@ -74,15 +74,4 @@ export class AdminController {
     ) {
         return this.subscriptionsService.resolveFraudAlert(id, action, req.user.userId);
     }
-
-    /**
-     * POST /admin/run-expire-subscriptions
-     * Fuerza la expiración de suscripciones vencidas manualmente.
-     * 🧪 Útil para pruebas — en producción lo hace el cron a las 3AM.
-     */
-    @Post('run-expire-subscriptions')
-    async runExpireSubscriptions() {
-        const count = await this.subscriptionsService.expireSubscriptions();
-        return { message: `Suscripciones expiradas: ${count}` };
-    }
 }
