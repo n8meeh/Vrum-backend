@@ -17,6 +17,7 @@ import { Group } from './entities/group.entity';
 @Injectable()
 export class GroupsService {
   private readonly MAX_GROUPS_PER_USER = 2;
+  private readonly MAX_MEMBERS_PER_GROUP = 1000;
 
   constructor(
     @InjectRepository(Group) private groupsRepo: Repository<Group>,
@@ -367,6 +368,14 @@ export class GroupsService {
       where: { id: groupId, isActive: true },
     });
     if (!group) throw new NotFoundException('Grupo no encontrado');
+
+    // Verificar límite de miembros
+    const currentCount = await this.getActiveMembersCount(groupId);
+    if (currentCount >= this.MAX_MEMBERS_PER_GROUP) {
+      throw new BadRequestException(
+        `Este grupo ha alcanzado el límite de ${this.MAX_MEMBERS_PER_GROUP} miembros.`,
+      );
+    }
 
     // Verificar si ya es miembro o tiene solicitud
     const existing = await this.membersRepo.findOne({
