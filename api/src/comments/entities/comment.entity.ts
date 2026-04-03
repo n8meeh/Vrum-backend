@@ -31,6 +31,9 @@ export class Comment {
     @Column({ name: 'is_professional', default: false })
     isProfessional: boolean;
 
+    @Column({ name: 'provider_id', nullable: true })
+    providerId: number | null;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 }

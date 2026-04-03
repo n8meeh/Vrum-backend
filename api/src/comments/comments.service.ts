@@ -79,12 +79,24 @@ export class CommentsService {
     const proComments = comments.filter((c) => c.isProfessional);
     if (proComments.length === 0) return;
 
-    const authorIds = [...new Set(proComments.map((c) => c.authorId))];
-    const providerMap = await this.resolveProviderIdentities(authorIds);
+    // Usar comment.providerId (guardado al crear) en vez de resolver por authorId actual.
+    // Esto evita que el comentario migre al nuevo negocio si el autor cambia de provider.
+    const providerIds = [...new Set(
+      proComments.map((c) => c.providerId).filter(Boolean) as number[]
+    )];
+
+    const providers = providerIds.length > 0
+      ? await this.providersRepository.find({
+          where: { id: In(providerIds) },
+          withDeleted: true,
+        })
+      : [];
+
+    const providerMap = new Map(providers.map((p) => [p.id, p]));
 
     for (const comment of comments) {
       if (comment.isProfessional) {
-        const prov = providerMap.get(comment.authorId);
+        const prov = providerMap.get(comment.providerId);
         if (prov) {
           comment.author = {
             ...comment.author,
@@ -178,6 +190,7 @@ export class CommentsService {
       authorId: authorId,
       isSolution: false,
       isProfessional: createCommentDto.isProfessional || false,
+      providerId: createCommentDto.isProfessional && provider ? provider.id : null,
     });
 
     const saved = await this.commentsRepository.save(comment);
@@ -192,11 +205,11 @@ export class CommentsService {
     });
 
     // Transformar autor si es comentario profesional (Identidad Dual)
-    if (fullComment && fullComment.isProfessional) {
-      const provMap = await this.resolveProviderIdentities([
-        fullComment.authorId,
-      ]);
-      const prov = provMap.get(fullComment.authorId);
+    if (fullComment && fullComment.isProfessional && fullComment.providerId) {
+      const prov = await this.providersRepository.findOne({
+        where: { id: fullComment.providerId },
+        withDeleted: true,
+      });
       if (prov) {
         (fullComment as any).author = {
           ...fullComment.author,

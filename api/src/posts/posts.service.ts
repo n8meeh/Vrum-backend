@@ -98,12 +98,24 @@ export class PostsService {
     const professionalPosts = posts.filter((p) => p.isProfessional);
     if (professionalPosts.length === 0) return;
 
-    const authorIds = [...new Set(professionalPosts.map((p) => p.authorId))];
-    const providerMap = await this.resolveProviderIdentities(authorIds);
+    // Usar post.providerId (guardado al crear) en vez de resolver por authorId actual.
+    // Esto evita que el post migre al nuevo negocio si el autor cambia de provider.
+    const providerIds = [...new Set(
+      professionalPosts.map((p) => p.providerId).filter(Boolean) as number[]
+    )];
+
+    const providers = providerIds.length > 0
+      ? await this.providersRepository.find({
+          where: { id: In(providerIds) },
+          withDeleted: true,
+        })
+      : [];
+
+    const providerMap = new Map(providers.map((p) => [p.id, p]));
 
     for (const post of posts) {
       if (post.isProfessional) {
-        const prov = providerMap.get(post.authorId);
+        const prov = providerMap.get(post.providerId);
         if (prov) {
           post.author = {
             ...post.author,
@@ -690,11 +702,12 @@ export class PostsService {
     enrichedPost.commentsCount = post.commentsCount || 0;
 
     // Transformar autor para post profesional (Identidad Dual)
-    if (enrichedPost.isProfessional) {
-      const provMap = await this.resolveProviderIdentities([
-        enrichedPost.authorId,
-      ]);
-      const prov = provMap.get(enrichedPost.authorId);
+    if (enrichedPost.isProfessional && enrichedPost.providerId) {
+      const providers = await this.providersRepository.find({
+        where: { id: enrichedPost.providerId },
+        withDeleted: true,
+      });
+      const prov = providers[0];
       if (prov) {
         enrichedPost.author = {
           ...enrichedPost.author,
