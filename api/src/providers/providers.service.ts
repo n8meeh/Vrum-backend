@@ -64,16 +64,16 @@ export class ProvidersService {
         }
 
         // 2. Al menos 5 chats con clientes distintos en order_negotiations
-        const distinctClients = await this.ordersRepo
-          .createQueryBuilder('order')
-          .innerJoin('order_negotiations', 'neg', 'neg.order_id = order.id')
-          .where('order.providerId = :providerId', { providerId: provider.id })
-          .select('COUNT(DISTINCT order.clientId)', 'count')
-          .getRawOne();
-
-        if (!distinctClients || parseInt(distinctClients.count) < 5) {
-          continue;
-        }
+        // 🧪 VALIDACIÓN COMENTADA PARA PRUEBAS — Descomentar en producción
+        // const distinctClients = await this.ordersRepo
+        //   .createQueryBuilder('order')
+        //   .innerJoin('order_negotiations', 'neg', 'neg.order_id = order.id')
+        //   .where('order.providerId = :providerId', { providerId: provider.id })
+        //   .select('COUNT(DISTINCT order.clientId)', 'count')
+        //   .getRawOne();
+        // if (!distinctClients || parseInt(distinctClients.count) < 5) {
+        //   continue;
+        // }
 
         // 3. Al menos 5 reseñas con promedio de 3+ estrellas
         const reviewStats = await this.reviewsRepo

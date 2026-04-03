@@ -144,4 +144,11 @@ export class ProvidersController {
   }
 
   // (Eliminé el método 'remove' genérico para evitar accidentes)
+
+  // 🧪 RUTA TEMPORAL DE PRUEBA — Eliminar antes de producción
+  @UseGuards(AuthGuard('jwt'))
+  @Post('run-verification-job')
+  runVerificationJob() {
+    return this.providersService.runVerificationJob();
+  }
 }
