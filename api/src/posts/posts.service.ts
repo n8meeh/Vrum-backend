@@ -129,14 +129,34 @@ export class PostsService {
   }
 
   // Editar Post
+  /**
+   * Verifica si userId pertenece al mismo negocio que authorId.
+   * Cubre: dueño vs staff del mismo provider, o dos staff del mismo provider.
+   */
+  private async isSameProvider(userId: number, authorId: number): Promise<boolean> {
+    if (userId === authorId) return true;
+
+    const resolveProviderId = async (uid: number): Promise<number | null> => {
+      const asOwner = await this.providersRepository.findOne({ where: { userId: uid } });
+      if (asOwner) return asOwner.id;
+      const user = await this.usersRepo.findOne({ where: { id: uid }, select: ['id', 'providerId'] });
+      return user?.providerId ?? null;
+    };
+
+    const [pid1, pid2] = await Promise.all([resolveProviderId(userId), resolveProviderId(authorId)]);
+    return pid1 !== null && pid2 !== null && pid1 === pid2;
+  }
+
   async update(id: number, userId: number, dto: UpdatePostDto) {
     const post = await this.postsRepository.findOne({ where: { id } });
 
     if (!post) throw new NotFoundException('La publicación no fue encontrada');
-    if (post.authorId !== userId)
-      throw new ForbiddenException(
-        'Solo puedes editar tus propias publicaciones',
-      );
+
+    const canEdit = post.authorId === userId ||
+      (post.isProfessional && await this.isSameProvider(userId, post.authorId));
+
+    if (!canEdit)
+      throw new ForbiddenException('Solo puedes editar tus propias publicaciones');
 
     Object.assign(post, dto);
     return await this.postsRepository.save(post);
@@ -147,10 +167,12 @@ export class PostsService {
     const post = await this.postsRepository.findOne({ where: { id } });
 
     if (!post) throw new NotFoundException('La publicación no fue encontrada');
-    if (post.authorId !== userId)
-      throw new ForbiddenException(
-        'Solo puedes eliminar tus propias publicaciones',
-      );
+
+    const canDelete = post.authorId === userId ||
+      (post.isProfessional && await this.isSameProvider(userId, post.authorId));
+
+    if (!canDelete)
+      throw new ForbiddenException('Solo puedes eliminar tus propias publicaciones');
 
     post.status = 'hidden';
     await this.postsRepository.save(post);

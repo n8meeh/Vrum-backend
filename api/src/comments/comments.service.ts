@@ -233,16 +233,35 @@ export class CommentsService {
   }
 
   // Editar Comentario
+  /**
+   * Verifica si userId pertenece al mismo negocio que authorId.
+   */
+  private async isSameProvider(userId: number, authorId: number): Promise<boolean> {
+    if (userId === authorId) return true;
+
+    const resolveProviderId = async (uid: number): Promise<number | null> => {
+      const asOwner = await this.providersRepository.findOne({ where: { userId: uid } });
+      if (asOwner) return asOwner.id;
+      const user = await this.usersRepo.findOne({ where: { id: uid }, select: ['id', 'providerId'] });
+      return user?.providerId ?? null;
+    };
+
+    const [pid1, pid2] = await Promise.all([resolveProviderId(userId), resolveProviderId(authorId)]);
+    return pid1 !== null && pid2 !== null && pid1 === pid2;
+  }
+
   async updateComment(commentId: number, userId: number, content: string) {
     const comment = await this.commentsRepository.findOne({
       where: { id: commentId },
     });
 
     if (!comment) throw new NotFoundException('Comentario no encontrado');
-    if (comment.authorId !== userId)
-      throw new ForbiddenException(
-        'Solo puedes modificar tus propios comentarios',
-      );
+
+    const canEdit = comment.authorId === userId ||
+      (comment.isProfessional && await this.isSameProvider(userId, comment.authorId));
+
+    if (!canEdit)
+      throw new ForbiddenException('Solo puedes modificar tus propios comentarios');
 
     comment.content = content;
     return await this.commentsRepository.save(comment);
@@ -255,10 +274,12 @@ export class CommentsService {
     });
 
     if (!comment) throw new NotFoundException('Comentario no encontrado');
-    if (comment.authorId !== userId)
-      throw new ForbiddenException(
-        'Solo puedes modificar tus propios comentarios',
-      );
+
+    const canDelete = comment.authorId === userId ||
+      (comment.isProfessional && await this.isSameProvider(userId, comment.authorId));
+
+    if (!canDelete)
+      throw new ForbiddenException('Solo puedes modificar tus propios comentarios');
 
     const postId = comment.postId;
 
