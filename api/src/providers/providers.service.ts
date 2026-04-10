@@ -19,6 +19,11 @@ import { UsersService } from '../users/users.service';
 import { MetricsService } from './metrics.service';
 import { EmailService } from '../auth/email.service';
 
+interface ValidationResult {
+  isValid: boolean;
+  reason?: string;
+}
+
 @Injectable()
 export class ProvidersService {
   private readonly logger = new Logger(ProvidersService.name);
@@ -141,6 +146,19 @@ export class ProvidersService {
     // Actualizamos todos los campos del DTO
     Object.assign(provider, dto);
 
+    // 🛡️ GATEKEEPER: Validación de Visibilidad
+    const validation = this.validateProfileCompleteness(provider);
+
+    // Caso A: Intento explícito de activar visibilidad sin cumplir requisitos
+    if (dto.isVisible === true && !validation.isValid) {
+      throw new BadRequestException(validation.reason);
+    }
+
+    // Caso B: Sincronización - Si pierde requisitos, forzamos isVisible a false
+    if (provider.isVisible && !validation.isValid) {
+      provider.isVisible = false;
+    }
+
     const savedProvider = await this.providersRepository.save(provider);
 
     // 🧹 LIMPIEZA: Quitamos el usuario de la respuesta
@@ -254,6 +272,12 @@ export class ProvidersService {
       provider.vehicleTypes = types;
     }
 
+    // 🛡️ GATEKEEPER: Sincronización de visibilidad
+    const validation = this.validateProfileCompleteness(provider);
+    if (provider.isVisible && !validation.isValid) {
+      provider.isVisible = false;
+    }
+
     return await this.providersRepository.save(provider);
   }
 
@@ -292,6 +316,21 @@ export class ProvidersService {
       });
 
       savedProvider = await this.providersRepository.save(newProvider);
+    }
+
+    // 🛡️ GATEKEEPER POST-SAVE: Validar si puede ser visible inicialmente
+    // Recargamos el provider con sus relaciones (especialmente specialties) para validar
+    const fullProvider = await this.providersRepository.findOne({
+      where: { id: savedProvider.id },
+      relations: ['specialties']
+    });
+
+    if (fullProvider && fullProvider.isVisible) {
+      const validation = this.validateProfileCompleteness(fullProvider);
+      if (!validation.isValid) {
+        await this.providersRepository.update(fullProvider.id, { isVisible: false });
+        savedProvider.isVisible = false;
+      }
     }
 
     // 🆕 LÓGICA DE ASCENSO: Actualizar rol del usuario a 'provider'
@@ -531,13 +570,67 @@ export class ProvidersService {
   async toggleVisibility(userId: number) {
     const provider = await this.findOneByUserId(userId);
     if (!provider) throw new BadRequestException('No tienes un negocio registrado');
-    provider.isVisible = !provider.isVisible;
+
+    const nextVisibility = !provider.isVisible;
+
+    // 🛡️ GATEKEEPER: Validar si intenta activar
+    if (nextVisibility === true) {
+      const validation = this.validateProfileCompleteness(provider);
+      if (!validation.isValid) {
+        throw new BadRequestException(validation.reason);
+      }
+    }
+
+    provider.isVisible = nextVisibility;
     await this.providersRepository.save(provider);
 
     return {
       message: provider.isVisible ? 'Tu taller ahora es visible en el mapa 🟢' : 'Tu taller está oculto (Modo Vacaciones) 🔴',
       isVisible: provider.isVisible
     };
+  }
+
+  /**
+   * 🛡️ Gatekeeper de Visibilidad
+   * Valida que el negocio tenga información de contacto y especialidades antes de ser público.
+   */
+  private validateProfileCompleteness(provider: Provider): ValidationResult {
+    // 1. Validar Contactos
+    const contacts = provider.contacts;
+    let hasValidContact = false;
+
+    if (contacts) {
+      const contactValues = [
+        contacts.whatsapp,
+        contacts.instagram,
+        contacts.facebook,
+        contacts.tiktok,
+        contacts.website,
+        contacts.phone,
+      ];
+
+      hasValidContact = contactValues.some((v) => {
+        if (!v) return false;
+        const val = String(v).trim();
+        // No vacío y no solo el prefijo por defecto
+        return val !== '' && val !== '+569' && val !== '+56';
+      });
+    }
+
+    // 2. Validar Especialidades
+    const hasSpecialties =
+      (provider.specialties && provider.specialties.length > 0) ||
+      (provider.specialtyBrands && provider.specialtyBrands.length > 0) ||
+      provider.isMultibrand === true;
+
+    if (!hasValidContact || !hasSpecialties) {
+      return {
+        isValid: false,
+        reason: 'Debes registrar métodos de contacto y especialidades para activar la visibilidad',
+      };
+    }
+
+    return { isValid: true };
   }
 
   // --- MÉTRICAS DE NEGOCIO ---
