@@ -393,6 +393,15 @@ export class ProvidersService {
       }
     }
 
+    // 🛡️ GATEKEEPER SYNC: Validar y corregir visibilidad si es necesario
+    if (provider) {
+      const validation = this.validateProfileCompleteness(provider);
+      if (provider.isVisible && !validation.isValid) {
+        provider.isVisible = false;
+        await this.providersRepository.update(provider.id, { isVisible: false });
+      }
+    }
+
     return provider;
   }
 
@@ -453,6 +462,16 @@ export class ProvidersService {
             },
           }
         });
+      }
+    }
+
+    // 🛡️ GATEKEEPER SYNC: Validar y corregir visibilidad si es necesario
+    if (provider) {
+      const validation = this.validateProfileCompleteness(provider);
+      if (provider.isVisible && !validation.isValid) {
+        this.logger.warn(`Auto-corrigiendo visibilidad de provider ${provider.id} por perfil incompleto.`);
+        provider.isVisible = false;
+        await this.providersRepository.update(provider.id, { isVisible: false });
       }
     }
 
