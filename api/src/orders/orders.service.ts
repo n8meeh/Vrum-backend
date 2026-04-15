@@ -215,6 +215,7 @@ export class OrdersService {
         .leftJoinAndSelect('order.provider', 'provider')
         .leftJoinAndSelect('order.vehicle', 'vehicle')
         .leftJoinAndSelect('order.post', 'post')
+        .leftJoinAndSelect('order.review', 'review')
         .leftJoin(
           (qb) =>
             qb
