@@ -72,6 +72,7 @@ export class MetricsService {
         return await this.metricsRepo.query(
             `SELECT 
                 DATE_FORMAT(date, '%Y-%m') AS month,
+                YEAR(date) AS year,
                 CAST(SUM(profile_views) AS UNSIGNED) as profileViews,
                 CAST(SUM(clicks_whatsapp) AS UNSIGNED) as clicksWhatsapp,
                 CAST(SUM(clicks_call) AS UNSIGNED) as clicksCall,
@@ -79,7 +80,7 @@ export class MetricsService {
                 CAST(SUM(clicks_whatsapp + clicks_call + clicks_route) AS UNSIGNED) as totalClicks
              FROM provider_metrics
              WHERE provider_id = ?
-             GROUP BY month
+             GROUP BY month, year
              ORDER BY month DESC
              LIMIT 12`,
             [providerId],
