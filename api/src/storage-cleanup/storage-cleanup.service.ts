@@ -25,43 +25,58 @@ export class StorageCleanupService {
     this.logger.log('🔄 Starting Firebase Storage orphan cleanup...');
 
     try {
-      const referencedPaths = await this.getAllReferencedPaths();
-      this.logger.log(`📦 Found ${referencedPaths.size} referenced file paths in DB.`);
-
       const bucket = admin.storage().bucket(BUCKET_NAME);
+      const [exists] = await bucket.exists();
+      if (!exists) {
+        this.logger.error(`❌ Bucket "${BUCKET_NAME}" not found. Check configuration.`);
+        return;
+      }
+
+      const referencedPaths = await this.getAllReferencedPaths();
+      this.logger.log(`📦 Found ${referencedPaths.size} unique referenced file paths in DB.`);
+
       const [files] = await bucket.getFiles();
-      this.logger.log(`☁️  Found ${files.length} files in Firebase Storage.`);
+      this.logger.log(`☁️  Found ${files.length} total objects in Firebase Storage.`);
 
       const now = Date.now();
       let deletedCount = 0;
-      let skippedCount = 0;
+      let skippedNewCount = 0;
+      let skippedInDbCount = 0;
 
       for (const file of files) {
+        // Ignorar objetos que representan carpetas virtuales (nombres que terminan en /)
+        if (file.name.endsWith('/')) continue;
+
         const [metadata] = await file.getMetadata();
         const timeCreated = new Date(metadata.timeCreated as string).getTime();
         const ageMs = now - timeCreated;
 
-        // Skip files newer than 24 hours
+        const filePath = file.name;
+
+        // 1. Saltars archivos con menos de 24 horas
         if (ageMs < MIN_AGE_MS) {
-          skippedCount++;
+          skippedNewCount++;
           continue;
         }
 
-        const filePath = file.name; // e.g. "posts/images/1750000000000_abc.jpg"
+        // 2. Saltar si está referenciado en la base de datos
+        if (referencedPaths.has(filePath)) {
+          skippedInDbCount++;
+          continue;
+        }
 
-        if (!referencedPaths.has(filePath)) {
-          try {
-            await file.delete();
-            this.logger.log(`🗑️  Deleted orphan: ${filePath}`);
-            deletedCount++;
-          } catch (deleteErr) {
-            this.logger.error(`❌ Failed to delete ${filePath}:`, deleteErr);
-          }
+        // 3. Borrar huérfano
+        try {
+          await file.delete();
+          this.logger.log(`🗑️  Deleted orphan: ${filePath}`);
+          deletedCount++;
+        } catch (deleteErr) {
+          this.logger.error(`❌ Failed to delete ${filePath}:`, deleteErr);
         }
       }
 
       this.logger.log(
-        `✅ Cleanup complete. Deleted: ${deletedCount} | Skipped (too new): ${skippedCount} | Referenced: ${files.length - deletedCount - skippedCount}`,
+        `✅ Cleanup complete. Deleted: ${deletedCount} | Too New: ${skippedNewCount} | In DB: ${skippedInDbCount} | Total: ${files.length}`,
       );
     } catch (err) {
       this.logger.error('❌ Storage cleanup failed:', err);
@@ -85,6 +100,7 @@ export class StorageCleanupService {
       'SELECT image_url  AS url FROM native_ads WHERE image_url IS NOT NULL',
       'SELECT photo_url  AS url FROM vehicles WHERE photo_url IS NOT NULL',
       'SELECT attachment_url AS url FROM vehicle_events WHERE attachment_url IS NOT NULL',
+      'SELECT icon_url       AS url FROM vehicle_types WHERE icon_url IS NOT NULL',
     ];
 
     for (const query of plainUrlQueries) {
@@ -98,7 +114,6 @@ export class StorageCleanupService {
     // ── JSON array URL columns ─────────────────────────────────────────────
     const jsonUrlQueries: string[] = [
       'SELECT media_url         AS json_val FROM posts     WHERE media_url         IS NOT NULL',
-      'SELECT identity_docs_url AS json_val FROM providers WHERE identity_docs_url IS NOT NULL',
     ];
 
     for (const query of jsonUrlQueries) {
@@ -134,14 +149,15 @@ export class StorageCleanupService {
    *
    * Returns null if the URL does not belong to this bucket.
    */
-  private extractFilePath(url: string): string | null {
-    if (!url) return null;
+  private extractFilePath(url: string | null): string | null {
+    if (!url || typeof url !== 'string') return null;
 
     try {
       // Format 1: public storage CDN URL
       const prefix1 = `https://storage.googleapis.com/${BUCKET_NAME}/`;
       if (url.startsWith(prefix1)) {
-        return url.slice(prefix1.length).split('?')[0];
+        const relativePath = url.slice(prefix1.length).split('?')[0];
+        return decodeURIComponent(relativePath);
       }
 
       // Format 2: firebasestorage download URL
@@ -151,7 +167,12 @@ export class StorageCleanupService {
         return decodeURIComponent(encodedPath);
       }
 
-      return null; // URL belongs to a different service — ignore
+      // Si ya es una ruta relativa (por ejemplo, guardada directamente)
+      if (!url.startsWith('http') && (url.includes('/') || url.includes('.'))) {
+        return decodeURIComponent(url);
+      }
+
+      return null;
     } catch {
       return null;
     }
