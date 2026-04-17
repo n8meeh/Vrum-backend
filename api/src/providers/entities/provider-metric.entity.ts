@@ -28,4 +28,16 @@ export class ProviderMetric {
 
     @Column({ name: 'clicks_route', default: 0 })
     clicksRoute: number;
+
+    @Column({ name: 'clicks_instagram', default: 0 })
+    clicksInstagram: number;
+
+    @Column({ name: 'clicks_facebook', default: 0 })
+    clicksFacebook: number;
+
+    @Column({ name: 'clicks_tiktok', default: 0 })
+    clicksTiktok: number;
+
+    @Column({ name: 'clicks_website', default: 0 })
+    clicksWebsite: number;
 }
