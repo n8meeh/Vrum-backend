@@ -25,6 +25,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { ProductsModule } from './products/products.module';
 import { GroupsModule } from './groups/groups.module';
 import { StorageCleanupModule } from './storage-cleanup/storage-cleanup.module';
+import { FavoritesModule } from './favorites/favorites.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
@@ -68,6 +69,7 @@ import { APP_GUARD } from '@nestjs/core';
     ProductsModule,
     GroupsModule,
     StorageCleanupModule,
+    FavoritesModule,
   ],
   controllers: [AppController],
   providers: [
