@@ -9,9 +9,12 @@ import { AppModule } from './app.module';
 import { Logger, ValidationPipe, ClassSerializerInterceptor, BadRequestException } from '@nestjs/common';
 // 👇 1. Importa esto
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // 🛡️ SEGURIDAD: Proteger cabeceras HTTP
+  app.use(helmet());
   const logger = new Logger('Bootstrap');
 
   app.setGlobalPrefix('api');
