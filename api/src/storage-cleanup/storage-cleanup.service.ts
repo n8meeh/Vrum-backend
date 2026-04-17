@@ -91,49 +91,55 @@ export class StorageCleanupService {
     const paths = new Set<string>();
 
     // ── Plain varchar URL columns ──────────────────────────────────────────
-    const plainUrlQueries: string[] = [
-      'SELECT avatar_url AS url FROM users WHERE avatar_url IS NOT NULL',
-      'SELECT logo_url   AS url FROM providers WHERE logo_url IS NOT NULL',
-      'SELECT cover_url  AS url FROM providers WHERE cover_url IS NOT NULL',
-      'SELECT image_url  AS url FROM provider_products WHERE image_url IS NOT NULL',
-      'SELECT image_url  AS url FROM groups WHERE image_url IS NOT NULL',
-      'SELECT image_url  AS url FROM native_ads WHERE image_url IS NOT NULL',
-      'SELECT photo_url  AS url FROM vehicles WHERE photo_url IS NOT NULL',
-      'SELECT attachment_url AS url FROM vehicle_events WHERE attachment_url IS NOT NULL',
-      'SELECT icon_url       AS url FROM vehicle_types WHERE icon_url IS NOT NULL',
+    const plainUrlQueries = [
+      { table: 'users', col: 'avatar_url', query: 'SELECT avatar_url AS url FROM `users` WHERE avatar_url IS NOT NULL' },
+      { table: 'providers', col: 'logo_url', query: 'SELECT logo_url   AS url FROM `providers` WHERE logo_url IS NOT NULL' },
+      { table: 'providers', col: 'cover_url', query: 'SELECT cover_url  AS url FROM `providers` WHERE cover_url IS NOT NULL' },
+      { table: 'provider_products', col: 'image_url', query: 'SELECT image_url  AS url FROM `provider_products` WHERE image_url IS NOT NULL' },
+      { table: 'groups', col: 'image_url', query: 'SELECT image_url  AS url FROM `groups` WHERE image_url IS NOT NULL' },
+      { table: 'native_ads', col: 'image_url', query: 'SELECT image_url  AS url FROM `native_ads` WHERE image_url IS NOT NULL' },
+      { table: 'vehicles', col: 'photo_url', query: 'SELECT photo_url  AS url FROM `vehicles` WHERE photo_url IS NOT NULL' },
+      { table: 'vehicle_events', col: 'attachment_url', query: 'SELECT attachment_url AS url FROM `vehicle_events` WHERE attachment_url IS NOT NULL' },
+      { table: 'vehicle_types', col: 'icon_url', query: 'SELECT icon_url AS url FROM `vehicle_types` WHERE icon_url IS NOT NULL' },
     ];
 
-    for (const query of plainUrlQueries) {
-      const rows: { url: string }[] = await this.dataSource.query(query);
-      for (const row of rows) {
-        const normalized = this.extractFilePath(row.url);
-        if (normalized) paths.add(normalized);
+    for (const item of plainUrlQueries) {
+      try {
+        const rows: { url: string }[] = await this.dataSource.query(item.query);
+        for (const row of rows) {
+          const normalized = this.extractFilePath(row.url);
+          if (normalized) paths.add(normalized);
+        }
+      } catch (err) {
+        this.logger.warn(`⚠️ Error fetching references from ${item.table}.${item.col}: ${err.message}`);
       }
     }
 
     // ── JSON array URL columns ─────────────────────────────────────────────
-    const jsonUrlQueries: string[] = [
-      'SELECT media_url         AS json_val FROM posts     WHERE media_url         IS NOT NULL',
+    const jsonUrlQueries = [
+      { table: 'posts', col: 'media_url', query: 'SELECT media_url AS json_val FROM `posts` WHERE media_url IS NOT NULL' },
     ];
 
-    for (const query of jsonUrlQueries) {
-      const rows: { json_val: string | string[] }[] = await this.dataSource.query(query);
-      for (const row of rows) {
-        try {
-          const arr: unknown[] =
-            Array.isArray(row.json_val)
-              ? row.json_val
-              : JSON.parse(row.json_val as string);
+    for (const item of jsonUrlQueries) {
+      try {
+        const rows: { json_val: string | string[] }[] = await this.dataSource.query(item.query);
+        for (const row of rows) {
+          try {
+            const arr: unknown[] =
+              Array.isArray(row.json_val)
+                ? row.json_val
+                : JSON.parse(row.json_val as string);
 
-          for (const item of arr) {
-            if (typeof item === 'string') {
-              const normalized = this.extractFilePath(item);
-              if (normalized) paths.add(normalized);
+            for (const item of arr) {
+              if (typeof item === 'string') {
+                const normalized = this.extractFilePath(item);
+                if (normalized) paths.add(normalized);
+              }
             }
-          }
-        } catch {
-          // Malformed JSON in DB row — skip silently
+          } catch { /* Malformed JSON */ }
         }
+      } catch (err) {
+        this.logger.warn(`⚠️ Error fetching JSON references from ${item.table}.${item.col}: ${err.message}`);
       }
     }
 
