@@ -62,6 +62,12 @@ export class ProvidersController {
     return this.providersService.getMyMetrics(req.user.userId);
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @Get('my-metrics/history')
+  getMyMetricsHistory(@Request() req) {
+    return this.providersService.getMyMetricsHistory(req.user.userId);
+  }
+
   @Post(':id/track')
   async trackClick(@Param('id') id: string, @Body('type') type: string) {
     const allowed = ['whatsapp', 'call', 'route'] as const;

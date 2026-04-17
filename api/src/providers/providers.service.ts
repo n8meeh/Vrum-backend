@@ -18,6 +18,7 @@ import { Negotiation } from '../negotiations/entities/negotiation.entity';
 import { UsersService } from '../users/users.service';
 import { MetricsService } from './metrics.service';
 import { EmailService } from '../auth/email.service';
+import { UserFavoriteProvider } from '../favorites/entities/favorite.entity';
 
 interface ValidationResult {
   isValid: boolean;
@@ -37,6 +38,7 @@ export class ProvidersService {
     @InjectRepository(Review) private reviewsRepo: Repository<Review>,
     @InjectRepository(Order) private ordersRepo: Repository<Order>,
     @InjectRepository(Negotiation) private negotiationsRepo: Repository<Negotiation>,
+    @InjectRepository(UserFavoriteProvider) private favoritesRepo: Repository<UserFavoriteProvider>,
     private usersService: UsersService,
     private metricsService: MetricsService,
     private emailService: EmailService,
@@ -657,17 +659,91 @@ export class ProvidersService {
     const provider = await this.findOneByUserId(userId);
     if (!provider) throw new BadRequestException('No tienes un negocio registrado');
 
-    const stats = await this.metricsService.getAggregated(provider.id);
+    const stats = await this.metricsService.getMonthlyStats(provider.id);
     const conversionRate = stats.profileViews > 0
       ? Math.round((stats.totalClicks / stats.profileViews) * 100 * 10) / 10
       : 0;
+
+    const targetMonth = new Date().getMonth() + 1;
+    const targetYear = new Date().getFullYear();
+
+    const [favoritesCount, orderStats, revenueData, recurringData] = await Promise.all([
+      this.favoritesRepo.count({ where: { providerId: provider.id } }),
+      this.ordersRepo.createQueryBuilder('order')
+        .select('status')
+        .addSelect('COUNT(*)', 'count')
+        .where('order.provider_id = :providerId', { providerId: provider.id })
+        .andWhere('MONTH(order.createdAt) = :month', { month: targetMonth })
+        .andWhere('YEAR(order.createdAt) = :year', { year: targetYear })
+        .groupBy('status')
+        .getRawMany(),
+      // 1. Ingresos Totales (Solo órdenes completadas de este mes)
+      this.ordersRepo.createQueryBuilder('order')
+        .select('SUM(order.finalPrice)', 'total')
+        .where('order.provider_id = :providerId', { providerId: provider.id })
+        .andWhere('order.status = :status', { status: 'completed' })
+        .andWhere('MONTH(order.createdAt) = :month', { month: targetMonth })
+        .andWhere('YEAR(order.createdAt) = :year', { year: targetYear })
+        .getRawOne(),
+      // 2. Clientes Recurrentes (Que han vuelto este mes)
+      this.ordersRepo.query(
+        `SELECT COUNT(*) as count FROM (
+          SELECT client_id FROM orders 
+          WHERE provider_id = ? 
+            AND MONTH(created_at) = ? 
+            AND YEAR(created_at) = ?
+          GROUP BY client_id 
+          HAVING COUNT(*) > 1
+        ) as recurring`,
+        [provider.id, targetMonth, targetYear]
+      )
+    ]);
+
+    const orders = {
+      total: 0,
+      pending: 0,
+      accepted: 0,
+      inProgress: 0,
+      completed: 0,
+      cancelled: 0
+    };
+
+    orderStats.forEach(s => {
+      const count = parseInt(s.count);
+      orders.total += count;
+      if (s.status === 'pending') orders.pending = count;
+      if (s.status === 'accepted') orders.accepted = count;
+      if (s.status === 'in_progress') orders.inProgress = count;
+      if (s.status === 'completed') orders.completed = count;
+      if (s.status === 'cancelled') orders.cancelled = count;
+    });
+
+    const totalRevenue = Number(revenueData?.total) || 0;
+    const averageTicket = orders.completed > 0 ? totalRevenue / orders.completed : 0;
+    const recurringCustomers = parseInt(recurringData[0]?.count) || 0;
 
     return {
       ...stats,
       conversionRate,
       ratingAvg: Number(provider.ratingAvg) || 0,
       reviewCount: (provider as any).reviewsCount ?? 0,
+      favoritesCount,
+      revenue: {
+        total: totalRevenue,
+        averageTicket: Math.round(averageTicket)
+      },
+      loyalty: {
+        recurringCustomers
+      },
+      orders
     };
+  }
+
+  async getMyMetricsHistory(userId: number) {
+    const provider = await this.findOneByUserId(userId);
+    if (!provider) throw new BadRequestException('No tienes un negocio registrado');
+
+    return this.metricsService.getHistory(provider.id);
   }
 
   async trackProfileView(providerId: number): Promise<void> {

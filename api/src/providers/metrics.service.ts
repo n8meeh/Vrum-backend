@@ -14,7 +14,7 @@ export class MetricsService {
 
     /**
      * Incrementa un contador de métrica para el día de hoy.
-     * Usa INSERT ... ON DUPLICATE KEY UPDATE para atomicidad.
+     * IMPORTANTE: Requiere un índice UNIQUE(provider_id, date) en la DB.
      */
     async track(providerId: number, field: MetricField): Promise<void> {
         const allowed: MetricField[] = ['profile_views', 'clicks_whatsapp', 'clicks_call', 'clicks_route'];
@@ -29,15 +29,19 @@ export class MetricsService {
     }
 
     /**
-     * Devuelve las métricas acumuladas de los últimos 30 días para un proveedor.
+     * Devuelve las métricas de un mes específico (por defecto el actual).
+     * Esto hace que el dashboard se "resetee" cada mes.
      */
-    async getAggregated(providerId: number): Promise<{
+    async getMonthlyStats(providerId: number, month?: number, year?: number): Promise<{
         profileViews: number;
         clicksWhatsapp: number;
         clicksCall: number;
         clicksRoute: number;
         totalClicks: number;
     }> {
+        const targetMonth = month || new Date().getMonth() + 1;
+        const targetYear = year || new Date().getFullYear();
+
         const rows = await this.metricsRepo.query(
             `SELECT
                 COALESCE(SUM(profile_views), 0)   AS profileViews,
@@ -46,8 +50,9 @@ export class MetricsService {
                 COALESCE(SUM(clicks_route), 0)    AS clicksRoute
              FROM provider_metrics
              WHERE provider_id = ?
-               AND date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`,
-            [providerId],
+               AND MONTH(date) = ?
+               AND YEAR(date) = ?`,
+            [providerId, targetMonth, targetYear],
         );
 
         const r = rows[0] || {};
@@ -58,5 +63,26 @@ export class MetricsService {
         const totalClicks = clicksWhatsapp + clicksCall + clicksRoute;
 
         return { profileViews, clicksWhatsapp, clicksCall, clicksRoute, totalClicks };
+    }
+
+    /**
+     * Devuelve un resumen mensual de los últimos 12 meses.
+     */
+    async getHistory(providerId: number) {
+        return await this.metricsRepo.query(
+            `SELECT 
+                DATE_FORMAT(date, '%Y-%m') AS month,
+                CAST(SUM(profile_views) AS UNSIGNED) as profileViews,
+                CAST(SUM(clicks_whatsapp) AS UNSIGNED) as clicksWhatsapp,
+                CAST(SUM(clicks_call) AS UNSIGNED) as clicksCall,
+                CAST(SUM(clicks_route) AS UNSIGNED) as clicksRoute,
+                CAST(SUM(clicks_whatsapp + clicks_call + clicks_route) AS UNSIGNED) as totalClicks
+             FROM provider_metrics
+             WHERE provider_id = ?
+             GROUP BY month
+             ORDER BY month DESC
+             LIMIT 12`,
+            [providerId],
+        );
     }
 }

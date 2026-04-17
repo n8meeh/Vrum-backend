@@ -15,6 +15,7 @@ import { Negotiation } from '../negotiations/entities/negotiation.entity';
 import { MetricsService } from './metrics.service';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
+import { UserFavoriteProvider } from '../favorites/entities/favorite.entity';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { AuthModule } from '../auth/auth.module';
       Review,
       Order,
       Negotiation,
+      UserFavoriteProvider,
     ]),
     UsersModule,
     AuthModule,
