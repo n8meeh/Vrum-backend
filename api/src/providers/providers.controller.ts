@@ -58,8 +58,16 @@ export class ProvidersController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('my-metrics')
-  getMyMetrics(@Request() req) {
-    return this.providersService.getMyMetrics(req.user.userId);
+  getMyMetrics(
+    @Request() req,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
+    return this.providersService.getMyMetrics(
+      req.user.userId,
+      month ? +month : undefined,
+      year ? +year : undefined,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'))

@@ -655,17 +655,17 @@ export class ProvidersService {
   }
 
   // --- MÉTRICAS DE NEGOCIO ---
-  async getMyMetrics(userId: number) {
+  async getMyMetrics(userId: number, month?: number, year?: number) {
     const provider = await this.findOneByUserId(userId);
     if (!provider) throw new BadRequestException('No tienes un negocio registrado');
 
-    const stats = await this.metricsService.getMonthlyStats(provider.id);
+    const targetMonth = month || new Date().getMonth() + 1;
+    const targetYear = year || new Date().getFullYear();
+
+    const stats = await this.metricsService.getMonthlyStats(provider.id, targetMonth, targetYear);
     const conversionRate = stats.profileViews > 0
       ? Math.round((stats.totalClicks / stats.profileViews) * 100 * 10) / 10
       : 0;
-
-    const targetMonth = new Date().getMonth() + 1;
-    const targetYear = new Date().getFullYear();
 
     const [favoritesCount, orderStats, revenueData, recurringData] = await Promise.all([
       this.favoritesRepo.count({ where: { providerId: provider.id } }),
