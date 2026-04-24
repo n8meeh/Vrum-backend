@@ -72,7 +72,7 @@ export class AuthService {
   async forgotPassword(email: string) {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
-      return { message: 'Si el correo existe, se ha enviado un código.' };
+      throw new BadRequestException('Este email no está registrado, verifica el email ingresado.');
     }
 
     // Código numérico de 6 dígitos
