@@ -9,7 +9,10 @@ export class EmailService {
 
   constructor() {
     const apiKey = process.env.RESEND_API_KEY;
-    const supportEmail = process.env.SUPPORT_EMAIL || 'contactobrumh@gmail.com';
+    // SUPPORT_EMAIL debe ser un dominio verificado en Resend (ej: soporte@brumh.cl)
+    // NO usar @gmail.com ni dominios externos sin verificar — Resend los rechaza con 403.
+    // Mientras no tengas dominio verificado, usa onboarding@resend.dev (solo para pruebas).
+    const supportEmail = process.env.SUPPORT_EMAIL || 'onboarding@resend.dev';
     this.from = `Brumh <${supportEmail}>`;
 
     if (!apiKey) {
@@ -18,7 +21,12 @@ export class EmailService {
       );
     } else {
       this.resend = new Resend(apiKey);
-      this.logger.log('Resend inicializado correctamente.');
+      this.logger.log(`Resend inicializado. FROM: ${this.from}`);
+      if (!supportEmail.endsWith('@resend.dev') && !supportEmail.includes('brumh.cl')) {
+        this.logger.warn(
+          `ATENCIÓN: El dominio del remitente (${supportEmail}) debe estar verificado en https://resend.com/domains`,
+        );
+      }
     }
   }
 

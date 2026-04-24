@@ -31,8 +31,10 @@ services:
       MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN}
       JWT_SECRET: ${JWT_SECRET}
       RESEND_API_KEY: ${RESEND_API_KEY}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL}
       BACKEND_URL: ${BACKEND_URL}
       WEB_URL: ${WEB_URL}
+      PREMIUM_PAYMENT_URL: ${PREMIUM_PAYMENT_URL}
 
   brumh_pma:
     # Antes era vrum_pma
