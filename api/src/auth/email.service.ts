@@ -9,7 +9,7 @@ export class EmailService {
 
   constructor() {
     const apiKey = process.env.RESEND_API_KEY;
-    const supportEmail = process.env.SUPPORT_EMAIL || 'soporte@brumh.cl';
+    const supportEmail = process.env.SUPPORT_EMAIL || 'contactobrumh@gmail.com';
     this.from = `Brumh <${supportEmail}>`;
 
     if (!apiKey) {
@@ -41,19 +41,14 @@ export class EmailService {
 
           <!-- ══════ HEADER + LOGO TEXTO ══════ -->
           <tr>
-            <td style="background:linear-gradient(145deg,#0f172a 0%,#1e293b 100%);padding:40px 40px 32px;text-align:center;">
-              <p style="margin:0;font-size:42px;font-weight:800;letter-spacing:2px;line-height:1;">
-                <span style="color:#ffffff;">bru</span><span style="color:#2563eb;">m</span><span style="color:#ffffff;">h</span>
-              </p>
-              <p style="margin:10px 0 0;color:#64748b;font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:500;">
-                Tu comunidad automotriz
-              </p>
+            <td style="padding-top: 10px">
+              <img src="https://brumh.cl/assets/LogoClaroLogin-B2ZMPOfG.png" alt="Brumh Logo" width="180" height="100" style="display:block;margin:0 auto 12px;background-color: #f0f0f0;">
             </td>
           </tr>
 
           <!-- ══════ CUERPO ══════ -->
           <tr>
-            <td style="padding:36px 40px 16px;">
+            <td>
               <h2 style="margin:0 0 10px;color:#0f172a;font-size:22px;font-weight:700;text-align:center;">
                 Tu código de verificación
               </h2>
@@ -156,19 +151,14 @@ export class EmailService {
 
           <!-- ══════ HEADER ══════ -->
           <tr>
-            <td style="background:linear-gradient(145deg,#0f172a 0%,#1e293b 100%);padding:40px 40px 32px;text-align:center;">
-              <p style="margin:0;font-size:42px;font-weight:800;letter-spacing:2px;line-height:1;">
-                <span style="color:#ffffff;">bru</span><span style="color:#2563eb;">m</span><span style="color:#ffffff;">h</span>
-              </p>
-              <p style="margin:10px 0 0;color:#64748b;font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:500;">
-                Tu comunidad automotriz
-              </p>
+            <td style="padding-top: 10px">
+<img src="https://brumh.cl/assets/LogoClaroLogin-B2ZMPOfG.png" alt="Brumh Logo" width="180" height="100" style="display:block;margin:0 auto 12px;background-color: #f0f0f0;">
             </td>
           </tr>
 
           <!-- ══════ ICONO BIENVENIDA ══════ -->
           <tr>
-            <td align="center" style="padding:32px 40px 0;">
+            <td align="center">
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="background-color:#ecfdf5;width:72px;height:72px;border-radius:36px;text-align:center;vertical-align:middle;font-size:36px;">
@@ -204,7 +194,7 @@ export class EmailService {
                       ✅ Completa tu perfil con fotos y descripción
                     </p>
                     <p style="margin:0 0 8px;color:#334155;font-size:13px;line-height:1.6;">
-                      ✅ Agrega tus servicios y precios
+                      ✅ Agrega tus servicios y/o productos además de sus respectivos precios
                     </p>
                     <p style="margin:0 0 8px;color:#334155;font-size:13px;line-height:1.6;">
                       ✅ Configura tu ubicación para aparecer en el mapa
@@ -261,7 +251,7 @@ export class EmailService {
 
   async sendProviderClosedEmail(to: string, providerName: string): Promise<void> {
     const year = new Date().getFullYear();
-    const supportEmail = process.env.SUPPORT_EMAIL || 'soporte@brumh.cl';
+    const supportEmail = process.env.SUPPORT_EMAIL || 'contactobrumh@gmail.com';
 
     const html = `
 <!DOCTYPE html>
@@ -279,19 +269,14 @@ export class EmailService {
 
           <!-- ══════ HEADER ══════ -->
           <tr>
-            <td style="background:linear-gradient(145deg,#0f172a 0%,#1e293b 100%);padding:40px 40px 32px;text-align:center;">
-              <p style="margin:0;font-size:42px;font-weight:800;letter-spacing:2px;line-height:1;">
-                <span style="color:#ffffff;">bru</span><span style="color:#2563eb;">m</span><span style="color:#ffffff;">h</span>
-              </p>
-              <p style="margin:10px 0 0;color:#64748b;font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:500;">
-                Tu comunidad automotriz
-              </p>
+            <td style="padding-top: 10px">
+              <img src="https://brumh.cl/assets/LogoClaroLogin-B2ZMPOfG.png" alt="Brumh Logo" width="180" height="100" style="display:block;margin:0 auto 12px;background-color: #f0f0f0;">
             </td>
           </tr>
 
           <!-- ══════ CUERPO ══════ -->
           <tr>
-            <td style="padding:36px 40px 16px;">
+            <td>
               <h2 style="margin:0 0 10px;color:#0f172a;font-size:22px;font-weight:700;text-align:center;">
                 Tu negocio ha sido cerrado
               </h2>
@@ -312,6 +297,9 @@ export class EmailService {
                     </p>
                     <p style="margin:0 0 6px;color:#334155;font-size:13px;line-height:1.6;">
                       • Tu negocio ya no aparece en el mapa ni en búsquedas
+                    </p>
+                    <p style="margin:0 0 6px;color:#334155;font-size:13px;line-height:1.6;">
+                      • Los usuarios de Brumh no podrán contactarte ni solicitar tus servicios mediante la app
                     </p>
                     <p style="margin:0 0 6px;color:#334155;font-size:13px;line-height:1.6;">
                       • El personal vinculado ha sido desvinculado
@@ -383,7 +371,7 @@ export class EmailService {
 
   async sendPremiumRequestEmail(to: string, providerName: string, paymentUrl: string): Promise<void> {
     const year = new Date().getFullYear();
-    const supportEmail = process.env.SUPPORT_EMAIL || 'soporte@brumh.cl';
+    const supportEmail = process.env.SUPPORT_EMAIL || 'contactobrumh@gmail.com';
 
     const html = `
 <!DOCTYPE html>
@@ -401,19 +389,14 @@ export class EmailService {
 
           <!-- ══════ HEADER ══════ -->
           <tr>
-            <td style="background:linear-gradient(145deg,#0f172a 0%,#1e293b 100%);padding:40px 40px 32px;text-align:center;">
-              <p style="margin:0;font-size:42px;font-weight:800;letter-spacing:2px;line-height:1;">
-                <span style="color:#ffffff;">bru</span><span style="color:#2563eb;">m</span><span style="color:#ffffff;">h</span>
-              </p>
-              <p style="margin:10px 0 0;color:#64748b;font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:500;">
-                Tu comunidad automotriz
-              </p>
+              <td style="padding-top: 10px">
+              <img src="https://brumh.cl/assets/LogoClaroLogin-B2ZMPOfG.png" alt="Brumh Logo" width="180" height="100" style="display:block;margin:0 auto 12px;background-color: #f0f0f0;">
             </td>
           </tr>
 
           <!-- ══════ ICONO PREMIUM ══════ -->
           <tr>
-            <td align="center" style="padding:32px 40px 0;">
+            <td align="center">
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="background-color:#fef3c7;width:72px;height:72px;border-radius:36px;text-align:center;vertical-align:middle;font-size:36px;">
@@ -548,10 +531,9 @@ export class EmailService {
 
   async sendPremiumWelcomeEmail(to: string, providerName: string): Promise<void> {
     const year = new Date().getFullYear();
-    const supportEmail = process.env.SUPPORT_EMAIL || 'soporte@brumh.cl';
+    const supportEmail = process.env.SUPPORT_EMAIL || 'contactobrumh@gmail.com';
 
-    const html = `
-<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -566,19 +548,14 @@ export class EmailService {
 
           <!-- ══════ HEADER ══════ -->
           <tr>
-            <td style="background:linear-gradient(145deg,#0f172a 0%,#1e293b 100%);padding:40px 40px 32px;text-align:center;">
-              <p style="margin:0;font-size:42px;font-weight:800;letter-spacing:2px;line-height:1;">
-                <span style="color:#ffffff;">bru</span><span style="color:#2563eb;">m</span><span style="color:#ffffff;">h</span>
-              </p>
-              <p style="margin:10px 0 0;color:#64748b;font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:500;">
-                Tu comunidad automotriz
-              </p>
+            <td style="padding-top: 10px">
+              <img src="https://brumh.cl/assets/LogoClaroLogin-B2ZMPOfG.png" alt="Brumh Logo" width="180" height="100" style="display:block;margin:0 auto 12px;background-color: #f0f0f0;">
             </td>
           </tr>
 
           <!-- ══════ ICONO PREMIUM ══════ -->
           <tr>
-            <td align="center" style="padding:32px 40px 0;">
+            <td align="center">
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="background:linear-gradient(145deg,#2563eb 0%,#1d4ed8 100%);width:72px;height:72px;border-radius:36px;text-align:center;vertical-align:middle;font-size:36px;">
@@ -611,7 +588,10 @@ export class EmailService {
                       Tu plan Premium incluye:
                     </p>
                     <p style="margin:0 0 6px;color:#334155;font-size:13px;line-height:1.6;">
-                      ⭐ Propuestas y publicaciones ilimitadas
+                      ⭐ Propuestas, servicios y productos ilimitados
+                    </p>
+                    <p style="margin:0 0 6px;color:#334155;font-size:13px;line-height:1.6;">
+                      ⭐ Publicaciones y comentarios ilimitados
                     </p>
                     <p style="margin:0 0 6px;color:#334155;font-size:13px;line-height:1.6;">
                       ⭐ Badge de verificado Premium
