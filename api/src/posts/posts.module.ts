@@ -14,6 +14,7 @@ import { UserFollow } from '../users/entities/user-follow.entity'; // 👈 IMPOR
 import { UserBlock } from '../users/entities/user-block.entity';
 import { Provider } from '../providers/entities/provider.entity';
 import { User } from '../users/entities/user.entity';
+import { GroupMember } from '../groups/entities/group-member.entity';
 @Module({
   imports: [
     CommentsModule,
@@ -28,7 +29,8 @@ import { User } from '../users/entities/user.entity';
       UserFollow,
       UserBlock,
       Provider,
-      User
+      User,
+      GroupMember,
     ])
   ],
   controllers: [PostsController],

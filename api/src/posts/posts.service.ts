@@ -18,6 +18,7 @@ import { PollVote } from './entities/poll-vote.entity';
 import { PostLike } from './entities/post-like.entity';
 import { Post } from './entities/post.entity';
 import { Tag } from './entities/tag.entity';
+import { GroupMember } from '../groups/entities/group-member.entity';
 
 @Injectable()
 export class PostsService {
@@ -34,6 +35,7 @@ export class PostsService {
     @InjectRepository(Provider)
     private providersRepository: Repository<Provider>,
     @InjectRepository(User) private usersRepo: Repository<User>,
+    @InjectRepository(GroupMember) private groupMembersRepo: Repository<GroupMember>,
     private notificationTrigger: NotificationTriggerService,
   ) {}
 
@@ -167,11 +169,23 @@ export class PostsService {
 
     if (!post) throw new NotFoundException('La publicación no fue encontrada');
 
-    const canDelete = post.authorId === userId ||
+    let canDelete = post.authorId === userId ||
       (post.isProfessional && post.providerId && await this.isSameProvider(userId, post.providerId));
 
+    if (!canDelete && post.groupId) {
+      const membership = await this.groupMembersRepo.findOne({
+        where: {
+          groupId: post.groupId,
+          userId,
+          role: In(['admin', 'creator']),
+          status: 'active',
+        },
+      });
+      if (membership) canDelete = true;
+    }
+
     if (!canDelete)
-      throw new ForbiddenException('Solo puedes eliminar tus propias publicaciones');
+      throw new ForbiddenException('No tienes permiso para eliminar esta publicación');
 
     post.status = 'hidden';
     await this.postsRepository.save(post);
