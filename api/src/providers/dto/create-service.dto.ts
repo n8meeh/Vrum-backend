@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreateProviderServiceDto {
     @IsString()
@@ -15,4 +15,8 @@ export class CreateProviderServiceDto {
     @IsNumber()
     @IsOptional()
     priceMax: number;
+
+    @IsBoolean()
+    @IsOptional()
+    isActive?: boolean;
 }
