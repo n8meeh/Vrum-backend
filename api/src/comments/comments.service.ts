@@ -282,9 +282,15 @@ export class CommentsService {
       throw new ForbiddenException('Solo puedes modificar tus propios comentarios');
 
     const postId = comment.postId;
+    const wasSolution = comment.isSolution;
 
     // Aquí suele ser mejor borrado físico, o cambiar texto a "[Eliminado]"
     await this.commentsRepository.remove(comment);
+
+    // Si el comentario eliminado era la solución, desmarcar el post como resuelto
+    if (wasSolution) {
+      await this.postsRepo.update({ id: postId }, { isSolved: false });
+    }
 
     // Counter Cache: decrementar commentsCount en el post
     await this.postsRepo.decrement({ id: postId }, 'commentsCount', 1);
