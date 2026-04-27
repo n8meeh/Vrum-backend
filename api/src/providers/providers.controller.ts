@@ -8,6 +8,7 @@ import { CreateProviderServiceDto } from './dto/create-service.dto';
 import { UpdateProviderServiceDto } from './dto/update-provider-service.dto';
 import { UpdateVehicleTypesDto } from './dto/update-vehicle-types.dto';
 import { UpdateSpecialtiesDto } from './dto/update-specialties.dto';
+import { TrackClickDto } from './dto/track-click.dto';
 import { MetricsService } from './metrics.service';
 @Controller('providers')
 export class ProvidersController {
@@ -77,10 +78,8 @@ export class ProvidersController {
   }
 
   @Post(':id/track')
-  async trackClick(@Param('id') id: string, @Body('type') type: string) {
-    const allowed = ['whatsapp', 'call', 'route', 'instagram', 'facebook', 'tiktok', 'website'] as const;
-    if (!allowed.includes(type as any)) return { ok: false };
-    const field = `clicks_${type}` as any;
+  async trackClick(@Param('id') id: string, @Body() dto: TrackClickDto) {
+    const field = `clicks_${dto.type}` as any;
     await this.metricsService.track(+id, field);
     return { ok: true };
   }
