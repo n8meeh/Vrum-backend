@@ -78,7 +78,7 @@ export class ProvidersController {
 
   @Post(':id/track')
   async trackClick(@Param('id') id: string, @Body('type') type: string) {
-    const allowed = ['whatsapp', 'call', 'route'] as const;
+    const allowed = ['whatsapp', 'call', 'route', 'instagram', 'facebook', 'tiktok', 'website'] as const;
     if (!allowed.includes(type as any)) return { ok: false };
     const field = `clicks_${type}` as any;
     await this.metricsService.track(+id, field);
