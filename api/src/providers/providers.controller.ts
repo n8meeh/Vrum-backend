@@ -79,8 +79,14 @@ export class ProvidersController {
 
   @Post(':id/track')
   async trackClick(@Param('id') id: string, @Body() dto: TrackClickDto) {
+    const providerId = +id;
+    if (isNaN(providerId)) {
+      console.warn(`[Metrics] Invalid ID received: ${id}`);
+      return { ok: false, message: 'Invalid ID' };
+    }
+    console.log(`[Metrics] Tracking ${dto.type} for provider ${providerId}`);
     const field = `clicks_${dto.type}` as any;
-    await this.metricsService.track(+id, field);
+    await this.metricsService.track(providerId, field);
     return { ok: true };
   }
 
