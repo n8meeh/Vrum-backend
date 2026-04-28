@@ -30,8 +30,8 @@ export class StaffInvitation {
     @Column({ unique: true })
     token: string;
 
-    @Column({ type: 'enum', enum: ['pending', 'accepted', 'expired', 'cancelled'], default: 'pending' })
-    status: 'pending' | 'accepted' | 'expired' | 'cancelled';
+    @Column({ type: 'enum', enum: ['pending', 'accepted', 'expired', 'cancelled', 'rejected'], default: 'pending' })
+    status: 'pending' | 'accepted' | 'expired' | 'cancelled' | 'rejected';
 
     @Column({ name: 'expires_at', type: 'datetime' })
     expiresAt: Date;

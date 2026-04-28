@@ -55,6 +55,16 @@ export class StaffController {
   }
 
   /**
+   * POST /staff/reject/:token — Rechazar una invitación
+   * Solo requiere estar autenticado
+   */
+  @Post('reject/:token')
+  @UseGuards(AuthGuard('jwt'))
+  reject(@Request() req, @Param('token') token: string) {
+    return this.staffService.rejectInvitation(req.user.id, token);
+  }
+
+  /**
    * GET /staff/my-invitations — Ver invitaciones pendientes para el usuario actual
    * Cualquier usuario autenticado puede consultar
    */

@@ -241,6 +241,41 @@ export class StaffService {
   }
 
   /**
+   * Rechazar una invitación de staff
+   */
+  async rejectInvitation(userId: number, token: string) {
+    // 1. Buscar invitación válida
+    const invitation = await this.invitationsRepo.findOne({
+      where: { token, status: 'pending' },
+      relations: ['provider'],
+    });
+
+    if (!invitation) {
+      throw new NotFoundException(
+        'Invitación no encontrada o ya fue procesada.',
+      );
+    }
+
+    // 2. Verificar que el email del usuario coincida
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    if (user.email !== invitation.email) {
+      throw new ForbiddenException(
+        'Esta invitación no corresponde a tu cuenta.',
+      );
+    }
+
+    // 3. Marcar invitación como rechazada
+    invitation.status = 'rejected';
+    await this.invitationsRepo.save(invitation);
+
+    return {
+      message: `Has rechazado la invitación para unirte a ${invitation.provider.businessName}.`,
+    };
+  }
+
+  /**
    * Listar invitaciones del negocio
    */
   async getInvitations(userId: number) {
