@@ -12,7 +12,7 @@ export class EmailService {
     // SUPPORT_EMAIL debe ser un dominio verificado en Resend (ej: soporte@brumh.cl)
     // NO usar @gmail.com ni dominios externos sin verificar — Resend los rechaza con 403.
     // Mientras no tengas dominio verificado, usa onboarding@resend.dev (solo para pruebas).
-    const supportEmail = process.env.SUPPORT_EMAIL || 'onboarding@resend.dev';
+    const supportEmail = process.env.SUPPORT_EMAIL;
     this.from = `Brumh <${supportEmail}>`;
 
     if (!apiKey) {
@@ -259,7 +259,7 @@ export class EmailService {
 
   async sendProviderClosedEmail(to: string, providerName: string): Promise<void> {
     const year = new Date().getFullYear();
-    const supportEmail = process.env.SUPPORT_EMAIL || 'contactobrumh@gmail.com';
+    const supportEmail = 'contactobrumh@gmail.com';
 
     const html = `
 <!DOCTYPE html>
@@ -379,7 +379,7 @@ export class EmailService {
 
   async sendPremiumRequestEmail(to: string, providerName: string, paymentUrl: string): Promise<void> {
     const year = new Date().getFullYear();
-    const supportEmail = process.env.SUPPORT_EMAIL || 'contactobrumh@gmail.com';
+    const supportEmail = 'contactobrumh@gmail.com';
 
     const html = `
 <!DOCTYPE html>
@@ -539,7 +539,7 @@ export class EmailService {
 
   async sendPremiumWelcomeEmail(to: string, providerName: string): Promise<void> {
     const year = new Date().getFullYear();
-    const supportEmail = process.env.SUPPORT_EMAIL || 'contactobrumh@gmail.com';
+    const supportEmail = 'contactobrumh@gmail.com';
 
     const html = `<!DOCTYPE html>
 <html lang="es">

@@ -667,7 +667,7 @@ export class ProvidersService {
       ? Math.round((stats.totalClicks / stats.profileViews) * 100 * 10) / 10
       : 0;
 
-    const [favoritesCount, orderStats, revenueData, recurringData] = await Promise.all([
+    const [favoritesCount, orderStats, revenueData, recurringData, monthlyReviewStats] = await Promise.all([
       this.favoritesRepo.count({ where: { providerId: provider.id } }),
       this.ordersRepo.createQueryBuilder('order')
         .select('status')
@@ -696,7 +696,15 @@ export class ProvidersService {
           HAVING COUNT(*) > 1
         ) as recurring`,
         [provider.id, targetMonth, targetYear]
-      )
+      ),
+      // 3. Reseñas del mes (Conteo y Promedio)
+      this.reviewsRepo.createQueryBuilder('review')
+        .select('COUNT(*)', 'count')
+        .addSelect('AVG(review.ratingOverall)', 'avg')
+        .where('review.provider_id = :providerId', { providerId: provider.id })
+        .andWhere('MONTH(review.createdAt) = :month', { month: targetMonth })
+        .andWhere('YEAR(review.createdAt) = :year', { year: targetYear })
+        .getRawOne()
     ]);
 
     const orders = {
@@ -722,11 +730,16 @@ export class ProvidersService {
     const averageTicket = orders.completed > 0 ? totalRevenue / orders.completed : 0;
     const recurringCustomers = parseInt(recurringData[0]?.count) || 0;
 
+    const monthlyReviewsCount = parseInt(monthlyReviewStats?.count) || 0;
+    const monthlyRatingAvg = parseFloat(monthlyReviewStats?.avg) || 0;
+
     return {
       ...stats,
       conversionRate,
-      ratingAvg: Number(provider.ratingAvg) || 0,
-      reviewCount: (provider as any).reviewsCount ?? 0,
+      ratingAvg: Math.round(monthlyRatingAvg * 10) / 10,
+      reviewCount: monthlyReviewsCount,
+      globalRatingAvg: Number(provider.ratingAvg) || 0,
+      globalReviewCount: (provider as any).reviewsCount ?? 0,
       favoritesCount,
       revenue: {
         total: totalRevenue,
@@ -743,7 +756,31 @@ export class ProvidersService {
     const provider = await this.findOneByUserId(userId);
     if (!provider) throw new BadRequestException('No tienes un negocio registrado');
 
-    return this.metricsService.getHistory(provider.id);
+    const [metricsHistory, reviewsHistory] = await Promise.all([
+      this.metricsService.getHistory(provider.id),
+      this.reviewsRepo.createQueryBuilder('review')
+        .select("DATE_FORMAT(review.createdAt, '%Y-%m')", 'month')
+        .addSelect('COUNT(*)', 'reviewCount')
+        .addSelect('AVG(review.ratingOverall)', 'ratingAvg')
+        .where('review.provider_id = :providerId', { providerId: provider.id })
+        .groupBy('month')
+        .orderBy('month', 'DESC')
+        .limit(12)
+        .getRawMany()
+    ]);
+
+    // Mapear reseñas para búsqueda rápida
+    const reviewsMap = new Map(reviewsHistory.map(r => [r.month, r]));
+
+    // Combinar datos
+    return metricsHistory.map(m => {
+      const rev = reviewsMap.get(m.month);
+      return {
+        ...m,
+        reviewCount: parseInt(rev?.reviewCount) || 0,
+        ratingAvg: rev ? Math.round(parseFloat(rev.ratingAvg) * 10) / 10 : 0
+      };
+    });
   }
 
   async trackProfileView(providerId: number): Promise<void> {
