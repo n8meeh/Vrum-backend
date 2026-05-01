@@ -46,4 +46,41 @@ export class FirebaseService implements OnModuleInit {
             throw error;
         }
     }
+
+    /**
+     * Deletes a file from Firebase Storage given its public download URL.
+     * Silently skips URLs that don't belong to this bucket or are not parseable.
+     * Errors during deletion are logged as warnings so they never break the caller.
+     */
+    async deleteFileByUrl(url: string): Promise<void> {
+        if (!url) return;
+        const storagePath = this.extractStoragePath(url);
+        if (!storagePath) {
+            this.logger.warn(`deleteFileByUrl: could not parse path from URL "${url}"`);
+            return;
+        }
+        try {
+            const bucket = this.storage.bucket(this.bucketName);
+            await bucket.file(storagePath).delete();
+            this.logger.log(`🗑️ Deleted from storage: ${storagePath}`);
+        } catch (error) {
+            this.logger.warn(`deleteFileByUrl: could not delete "${storagePath}": ${error.message}`);
+        }
+    }
+
+    private extractStoragePath(url: string): string | null {
+        try {
+            const prefix1 = `https://storage.googleapis.com/${this.bucketName}/`;
+            if (url.startsWith(prefix1)) {
+                return decodeURIComponent(url.slice(prefix1.length).split('?')[0]);
+            }
+            const prefix2 = `https://firebasestorage.googleapis.com/v0/b/${this.bucketName}/o/`;
+            if (url.startsWith(prefix2)) {
+                return decodeURIComponent(url.slice(prefix2.length).split('?')[0]);
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    }
 }

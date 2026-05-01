@@ -7,6 +7,7 @@ import { VehicleType } from './entities/vehicle-type.entity';
 import { VehicleMileageLog } from './entities/vehicle-mileage-log.entity';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { Order } from '../orders/entities/order.entity';
+import { FirebaseService } from '../files/firebase.service';
 
 @Injectable()
 export class VehiclesService {
@@ -15,6 +16,7 @@ export class VehiclesService {
     @InjectRepository(VehicleType) private vehicleTypesRepo: Repository<VehicleType>,
     @InjectRepository(VehicleMileageLog) private mileageLogRepo: Repository<VehicleMileageLog>,
     @InjectRepository(Order) private ordersRepository: Repository<Order>,
+    private readonly firebaseService: FirebaseService,
   ) { }
 
   private readonly MAX_VEHICLES_PER_USER = 5;
@@ -96,6 +98,11 @@ export class VehiclesService {
 
     if (!vehicle) throw new NotFoundException('Vehículo no encontrado o no te pertenece');
 
+    // Cascade-delete: if the photo is being replaced, remove the old file from Storage.
+    if (dto.photoUrl && dto.photoUrl !== vehicle.photoUrl && vehicle.photoUrl) {
+      void this.firebaseService.deleteFileByUrl(vehicle.photoUrl);
+    }
+
     Object.assign(vehicle, dto);
     return await this.vehiclesRepository.save(vehicle);
   }
@@ -104,6 +111,13 @@ export class VehiclesService {
     const vehicle = await this.vehiclesRepository.findOne({ where: { id, userId } });
 
     if (!vehicle) throw new NotFoundException('Vehículo no encontrado o no te pertenece');
+
+    // Cascade-delete: remove the photo from Storage before soft-deleting.
+    // Without this the cleanup script would treat the file as "referenced" forever
+    // because the soft-deleted row still holds the URL.
+    if (vehicle.photoUrl) {
+      void this.firebaseService.deleteFileByUrl(vehicle.photoUrl);
+    }
 
     await this.vehiclesRepository.softDelete(vehicle.id);
 

@@ -6,10 +6,12 @@ import { Vehicle } from './entities/vehicle.entity';
 import { VehicleType } from './entities/vehicle-type.entity';
 import { VehicleMileageLog } from './entities/vehicle-mileage-log.entity';
 import { Order } from '../orders/entities/order.entity';
+import { FilesModule } from '../files/files.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Vehicle, VehicleType, VehicleMileageLog, Order])
+    TypeOrmModule.forFeature([Vehicle, VehicleType, VehicleMileageLog, Order]),
+    FilesModule,
   ],
   controllers: [VehiclesController],
   providers: [VehiclesService],

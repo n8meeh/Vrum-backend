@@ -15,10 +15,12 @@ import { UserBlock } from '../users/entities/user-block.entity';
 import { Provider } from '../providers/entities/provider.entity';
 import { User } from '../users/entities/user.entity';
 import { GroupMember } from '../groups/entities/group-member.entity';
+import { FilesModule } from '../files/files.module';
 @Module({
   imports: [
     CommentsModule,
     NotificationsModule,
+    FilesModule,
     // 👇 2. AGREGALA AQUÍ DENTRO DE LOS CORCHETES
     TypeOrmModule.forFeature([
       Post,

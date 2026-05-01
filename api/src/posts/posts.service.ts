@@ -11,6 +11,7 @@ import { Provider } from '../providers/entities/provider.entity';
 import { UserBlock } from '../users/entities/user-block.entity';
 import { UserFollow } from '../users/entities/user-follow.entity';
 import { User } from '../users/entities/user.entity'; // Asegúrate que la ruta sea correcta
+import { FirebaseService } from '../files/firebase.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { GetFeedDto } from './dto/get-feed.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
@@ -37,6 +38,7 @@ export class PostsService {
     @InjectRepository(User) private usersRepo: Repository<User>,
     @InjectRepository(GroupMember) private groupMembersRepo: Repository<GroupMember>,
     private notificationTrigger: NotificationTriggerService,
+    private readonly firebaseService: FirebaseService,
   ) {}
 
   /**
@@ -159,6 +161,14 @@ export class PostsService {
     if (!canEdit)
       throw new ForbiddenException('Solo puedes editar tus propias publicaciones');
 
+    // Cascade-delete: remove Storage files for any URLs dropped from the media array.
+    const oldMediaUrls: string[] = Array.isArray(post.mediaUrl) ? post.mediaUrl : [];
+    const newMediaUrls: string[] = Array.isArray(dto.mediaUrl) ? dto.mediaUrl : oldMediaUrls;
+    const removedUrls = oldMediaUrls.filter((url) => !newMediaUrls.includes(url));
+    for (const url of removedUrls) {
+      void this.firebaseService.deleteFileByUrl(url);
+    }
+
     Object.assign(post, dto);
     return await this.postsRepository.save(post);
   }
@@ -186,6 +196,13 @@ export class PostsService {
 
     if (!canDelete)
       throw new ForbiddenException('No tienes permiso para eliminar esta publicación');
+
+    // Cascade-delete: remove all attached media from Storage before hiding the post.
+    if (Array.isArray(post.mediaUrl)) {
+      for (const url of post.mediaUrl) {
+        void this.firebaseService.deleteFileByUrl(url);
+      }
+    }
 
     post.status = 'hidden';
     await this.postsRepository.save(post);

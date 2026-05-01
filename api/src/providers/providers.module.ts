@@ -16,6 +16,7 @@ import { MetricsService } from './metrics.service';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
 import { UserFavoriteProvider } from '../favorites/entities/favorite.entity';
+import { FilesModule } from '../files/files.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { UserFavoriteProvider } from '../favorites/entities/favorite.entity';
     ]),
     UsersModule,
     AuthModule,
+    FilesModule,
   ],
   controllers: [ProvidersController],
   providers: [ProvidersService, MetricsService],

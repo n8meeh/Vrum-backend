@@ -16,11 +16,14 @@ export class StorageCleanupService {
   constructor(private readonly dataSource: DataSource) {}
 
   /**
-   * Runs every day at 03:00 AM (server time).
+   * Runs every Sunday at 03:00 AM (server time).
    * Deletes Firebase Storage files that are not referenced in the database
    * and are older than 24 hours.
+   *
+   * Weekly cadence is sufficient because cascade-delete logic removes orphans
+   * immediately on most write paths, keeping the orphan backlog minimal.
    */
-  @Cron('0 3 * * *', { name: 'storage-cleanup' })
+  @Cron('0 3 * * 0', { name: 'storage-cleanup' })
   async handleStorageCleanup(): Promise<void> {
     this.logger.log('🔄 Starting Firebase Storage orphan cleanup...');
 
@@ -47,8 +50,9 @@ export class StorageCleanupService {
         // Ignorar objetos que representan carpetas virtuales (nombres que terminan en /)
         if (file.name.endsWith('/')) continue;
 
-        const [metadata] = await file.getMetadata();
-        const timeCreated = new Date(metadata.timeCreated as string).getTime();
+        // file.metadata is already populated by bucket.getFiles() — no extra API call needed.
+        // Calling file.getMetadata() here would waste 1 read operation per file (N extra calls).
+        const timeCreated = new Date(file.metadata.timeCreated as string).getTime();
         const ageMs = now - timeCreated;
 
         const filePath = file.name;
@@ -92,13 +96,13 @@ export class StorageCleanupService {
 
     // ── Plain varchar URL columns ──────────────────────────────────────────
     const plainUrlQueries = [
-      { table: 'users', col: 'avatar_url', query: 'SELECT avatar_url AS url FROM `users` WHERE avatar_url IS NOT NULL' },
-      { table: 'providers', col: 'logo_url', query: 'SELECT logo_url   AS url FROM `providers` WHERE logo_url IS NOT NULL' },
-      { table: 'providers', col: 'cover_url', query: 'SELECT cover_url  AS url FROM `providers` WHERE cover_url IS NOT NULL' },
+      { table: 'users', col: 'avatar_url', query: 'SELECT avatar_url AS url FROM `users` WHERE avatar_url IS NOT NULL AND deleted_at IS NULL' },
+      { table: 'providers', col: 'logo_url', query: 'SELECT logo_url   AS url FROM `providers` WHERE logo_url IS NOT NULL AND deleted_at IS NULL' },
+      { table: 'providers', col: 'cover_url', query: 'SELECT cover_url  AS url FROM `providers` WHERE cover_url IS NOT NULL AND deleted_at IS NULL' },
       { table: 'provider_products', col: 'image_url', query: 'SELECT image_url  AS url FROM `provider_products` WHERE image_url IS NOT NULL' },
       { table: 'groups', col: 'image_url', query: 'SELECT image_url  AS url FROM `groups` WHERE image_url IS NOT NULL' },
       { table: 'native_ads', col: 'image_url', query: 'SELECT image_url  AS url FROM `native_ads` WHERE image_url IS NOT NULL' },
-      { table: 'vehicles', col: 'photo_url', query: 'SELECT photo_url  AS url FROM `vehicles` WHERE photo_url IS NOT NULL' },
+      { table: 'vehicles', col: 'photo_url', query: 'SELECT photo_url  AS url FROM `vehicles` WHERE photo_url IS NOT NULL AND deleted_at IS NULL' },
       { table: 'vehicle_events', col: 'attachment_url', query: 'SELECT attachment_url AS url FROM `vehicle_events` WHERE attachment_url IS NOT NULL' },
       { table: 'vehicle_types', col: 'icon_url', query: 'SELECT icon_url AS url FROM `vehicle_types` WHERE icon_url IS NOT NULL' },
     ];

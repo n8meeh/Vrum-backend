@@ -19,6 +19,7 @@ import { UsersService } from '../users/users.service';
 import { MetricsService } from './metrics.service';
 import { EmailService } from '../auth/email.service';
 import { UserFavoriteProvider } from '../favorites/entities/favorite.entity';
+import { FirebaseService } from '../files/firebase.service';
 
 interface ValidationResult {
   isValid: boolean;
@@ -42,6 +43,7 @@ export class ProvidersService {
     private usersService: UsersService,
     private metricsService: MetricsService,
     private emailService: EmailService,
+    private readonly firebaseService: FirebaseService,
   ) { }
 
   /**
@@ -145,6 +147,10 @@ export class ProvidersService {
     const provider = await this.findOneByUserId(userId);
     if (!provider) throw new BadRequestException('No tienes un negocio registrado');
 
+    // Capture old image URLs before overwriting, for cascade-delete.
+    const oldLogoUrl = provider.logoUrl;
+    const oldCoverUrl = provider.coverUrl;
+
     // Actualizamos todos los campos del DTO
     Object.assign(provider, dto);
 
@@ -162,6 +168,14 @@ export class ProvidersService {
     }
 
     const savedProvider = await this.providersRepository.save(provider);
+
+    // Cascade-delete: remove old branding images from Storage if they were replaced.
+    if (dto.logoUrl !== undefined && dto.logoUrl !== oldLogoUrl && oldLogoUrl) {
+      void this.firebaseService.deleteFileByUrl(oldLogoUrl);
+    }
+    if (dto.coverUrl !== undefined && dto.coverUrl !== oldCoverUrl && oldCoverUrl) {
+      void this.firebaseService.deleteFileByUrl(oldCoverUrl);
+    }
 
     // 🧹 LIMPIEZA: Quitamos el usuario de la respuesta
     // Usamos (savedProvider as any) para evitar el error TS2790
@@ -196,6 +210,10 @@ export class ProvidersService {
 
     // 4. Ejecutamos el Soft Delete
     await this.providersRepository.softDelete(provider.id);
+
+    // Cascade-delete: remove branding images from Storage.
+    if (provider.logoUrl) void this.firebaseService.deleteFileByUrl(provider.logoUrl);
+    if (provider.coverUrl) void this.firebaseService.deleteFileByUrl(provider.coverUrl);
 
     // 📧 Enviar correo de cierre del negocio
     try {
