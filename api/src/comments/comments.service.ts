@@ -9,6 +9,7 @@ import { NotificationTriggerService } from '../notifications/notification-trigge
 import { Post } from '../posts/entities/post.entity';
 import { Provider } from '../providers/entities/provider.entity';
 import { User } from '../users/entities/user.entity';
+import { UserBlock } from '../users/entities/user-block.entity';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { Comment } from './entities/comment.entity';
 @Injectable()
@@ -20,6 +21,7 @@ export class CommentsService {
     @InjectRepository(User) private usersRepo: Repository<User>,
     @InjectRepository(Provider)
     private providersRepository: Repository<Provider>,
+    @InjectRepository(UserBlock) private blockRepo: Repository<UserBlock>,
     private notificationTrigger: NotificationTriggerService,
   ) {}
 
@@ -396,24 +398,36 @@ export class CommentsService {
     return { success: true, message };
   }
 
-  async findAll(postId: number) {
-    const comments = await this.commentsRepository.find({
-      where: { postId },
-      relations: ['author'],
-      select: {
-        id: true,
-        content: true,
-        isProfessional: true,
-        createdAt: true,
-        author: {
-          id: true,
-          fullName: true,
-          avatarUrl: true,
-          role: true,
-        },
-      },
-      order: { createdAt: 'ASC' },
-    });
+  async findAll(postId: number, currentUserId?: number) {
+    const qb = this.commentsRepository
+      .createQueryBuilder('comment')
+      .leftJoinAndSelect('comment.author', 'author')
+      .where('comment.postId = :postId', { postId })
+      .select([
+        'comment.id',
+        'comment.content',
+        'comment.isProfessional',
+        'comment.createdAt',
+        'author.id',
+        'author.fullName',
+        'author.avatarUrl',
+        'author.role',
+      ])
+      .orderBy('comment.createdAt', 'ASC');
+
+    // Bloqueo bidireccional: ocultar comentarios de usuarios bloqueados
+    if (currentUserId) {
+      qb.andWhere(
+        `author.id NOT IN (
+          SELECT ub.blocked_id FROM user_blocks ub WHERE ub.blocker_id = :me
+          UNION
+          SELECT ub.blocker_id FROM user_blocks ub WHERE ub.blocked_id = :me
+        )`,
+        { me: currentUserId },
+      );
+    }
+
+    const comments = await qb.getMany();
 
     // Transformar autor para comentarios profesionales (Identidad Dual)
     await this.applyDualIdentity(comments);
@@ -421,15 +435,27 @@ export class CommentsService {
     return comments;
   }
 
-  async findAllByPost(postId: number) {
-    const comments = await this.commentsRepository.find({
-      where: { postId },
-      relations: ['author'],
-      order: {
-        isSolution: 'DESC',
-        createdAt: 'ASC',
-      },
-    });
+  async findAllByPost(postId: number, currentUserId?: number) {
+    const qb = this.commentsRepository
+      .createQueryBuilder('comment')
+      .leftJoinAndSelect('comment.author', 'author')
+      .where('comment.postId = :postId', { postId })
+      .orderBy('comment.isSolution', 'DESC')
+      .addOrderBy('comment.createdAt', 'ASC');
+
+    // Bloqueo bidireccional: ocultar comentarios de usuarios bloqueados
+    if (currentUserId) {
+      qb.andWhere(
+        `author.id NOT IN (
+          SELECT ub.blocked_id FROM user_blocks ub WHERE ub.blocker_id = :me
+          UNION
+          SELECT ub.blocker_id FROM user_blocks ub WHERE ub.blocked_id = :me
+        )`,
+        { me: currentUserId },
+      );
+    }
+
+    const comments = await qb.getMany();
 
     // Transformar autor para comentarios profesionales (Identidad Dual)
     await this.applyDualIdentity(comments);

@@ -104,9 +104,9 @@ export class UsersController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('search')
-  searchUsers(@Query('q') q: string, @Query('limit') limit?: string) {
+  searchUsers(@Request() req, @Query('q') q: string, @Query('limit') limit?: string) {
     if (!q || !q.trim()) return [];
-    return this.usersService.searchUsers(q.trim(), limit ? +limit : 10);
+    return this.usersService.searchUsers(q.trim(), req.user.userId, limit ? +limit : 10);
   }
 
   @Get(':id')

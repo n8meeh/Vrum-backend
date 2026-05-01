@@ -3,6 +3,7 @@ import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { SolveCommentDto } from './dto/solve-comment.dto';
 import { AuthGuard } from '@nestjs/passport';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 @Controller('comments')
 export class CommentsController {
@@ -13,23 +14,25 @@ export class CommentsController {
   create(@Request() req, @Body() createCommentDto: CreateCommentDto) {
     return this.commentsService.create(req.user.userId, createCommentDto);
   }
-  @Get()
-  findAll(@Query('postId') postId: string) {
-    return this.commentsService.findAll(+postId);
-  }
 
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get()
+  findAll(@Query('postId') postId: string, @Request() req) {
+    return this.commentsService.findAll(+postId, req.user?.userId);
+  }
 
   @Patch(':id/solve')
   async solve(
     @Param('id') commentId: string,
-    @Body() solveDto: SolveCommentDto // ✅ Usamos el DTO para validar el body
+    @Body() solveDto: SolveCommentDto
   ) {
     return this.commentsService.markAsSolution(solveDto.userId, +commentId);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('post/:postId')
-  findAllByPost(@Param('postId') postId: string) {
-    return this.commentsService.findAllByPost(+postId);
+  findAllByPost(@Param('postId') postId: string, @Request() req) {
+    return this.commentsService.findAllByPost(+postId, req.user?.userId);
   }
 
   @Get('solutions/user/:userId')

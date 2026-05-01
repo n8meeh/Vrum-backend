@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { In, IsNull, Like, MoreThan, Repository } from 'typeorm';
+import { In, IsNull, MoreThan, Repository } from 'typeorm';
 import { GroupsService } from '../groups/groups.service';
 import { NotificationTriggerService } from '../notifications/notification-trigger.service';
 import { Post } from '../posts/entities/post.entity';
@@ -61,6 +61,11 @@ export class UsersService {
       // No está bloqueado → BLOQUEAR
       const newBlock = this.blockRepo.create({ blockerId, blockedId });
       await this.blockRepo.save(newBlock);
+
+      // Ruptura automática de seguimientos en ambas direcciones
+      await this.followRepo.delete({ followerId: blockerId, followedId: blockedId });
+      await this.followRepo.delete({ followerId: blockedId, followedId: blockerId });
+
       return {
         status: 'blocked',
         message: `Has bloqueado a ${targetUser.fullName}`,
@@ -256,6 +261,18 @@ export class UsersService {
    * @param currentUserId ID del usuario que está consultando (opcional, para isFollowing)
    */
   async findPublicProfile(id: number, currentUserId?: number) {
+    // 🔒 Bloqueo de Invisibilidad Total: si existe bloqueo en CUALQUIER dirección,
+    // devolver 404 (no 403) para que el recurso sea técnicamente inexistente.
+    if (currentUserId && Number(currentUserId) !== Number(id)) {
+      const blockExists = await this.blockRepo.count({
+        where: [
+          { blockerId: Number(currentUserId), blockedId: Number(id) },
+          { blockerId: Number(id), blockedId: Number(currentUserId) },
+        ],
+      });
+      if (blockExists > 0) throw new NotFoundException('Usuario no encontrado');
+    }
+
     const user = await this.usersRepository.findOne({
       where: { id },
       relations: ['provider'],
@@ -650,12 +667,26 @@ export class UsersService {
     }));
   }
 
-  async searchUsers(query: string, limit: number = 10) {
-    return this.usersRepository.find({
-      where: { fullName: Like(`%${query}%`) },
-      select: ['id', 'fullName', 'avatarUrl', 'role', 'bio'],
-      take: limit,
-      order: { fullName: 'ASC' },
-    });
+  async searchUsers(query: string, currentUserId?: number, limit: number = 10) {
+    const qb = this.usersRepository
+      .createQueryBuilder('user')
+      .where('user.fullName LIKE :q', { q: `%${query}%` })
+      .select(['user.id', 'user.fullName', 'user.avatarUrl', 'user.role', 'user.bio'])
+      .take(limit)
+      .orderBy('user.fullName', 'ASC');
+
+    // Excluir usuarios con bloqueo bidireccional
+    if (currentUserId) {
+      qb.andWhere(
+        `user.id NOT IN (
+          SELECT ub.blocked_id FROM user_blocks ub WHERE ub.blocker_id = :me
+          UNION
+          SELECT ub.blocker_id FROM user_blocks ub WHERE ub.blocked_id = :me
+        )`,
+        { me: currentUserId },
+      );
+    }
+
+    return qb.getMany();
   }
 }

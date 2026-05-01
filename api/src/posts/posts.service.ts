@@ -689,7 +689,7 @@ export class PostsService {
     // Subconsulta para contar likes totales
     queryBuilder.loadRelationCountAndMap('post.likesCount', 'post.likes');
 
-    // Si hay un usuario logueado, agregamos isLiked
+    // Si hay un usuario logueado, agregar isLiked + filtro de bloqueados
     if (userId) {
       queryBuilder.addSelect((subQuery) => {
         return subQuery
@@ -698,6 +698,20 @@ export class PostsService {
           .where('pl.post_id = post.id AND pl.user_id = :userId');
       }, 'post_isLikedByUser');
       queryBuilder.setParameter('userId', userId);
+
+      // Bloqueo bidireccional: excluir posts de quienes bloqueé y de quienes me bloquearon
+      const blockedRelations = await this.blockRepository.find({
+        where: [{ blockerId: userId }, { blockedId: userId }],
+      });
+      const blockedIds = new Set<number>();
+      blockedRelations.forEach((block) => {
+        blockedIds.add(block.blockerId === userId ? block.blockedId : block.blockerId);
+      });
+      if (blockedIds.size > 0) {
+        queryBuilder.andWhere('post.authorId NOT IN (:...blockedIdsAll)', {
+          blockedIdsAll: Array.from(blockedIds),
+        });
+      }
     }
 
     const posts = await queryBuilder.getMany();

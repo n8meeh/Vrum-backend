@@ -7,16 +7,18 @@ import { Comment } from './entities/comment.entity';
 import { Provider } from '../providers/entities/provider.entity';
 import { Post } from '../posts/entities/post.entity';
 import { User } from '../users/entities/user.entity';
+import { UserBlock } from '../users/entities/user-block.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     NotificationsModule,
     TypeOrmModule.forFeature([
-      Comment,  // Tu entidad principal
-      Provider, // 👈 NECESARIA PARA LA VALIDACIÓN FREEMIUM
-      Post,     // Seguramente la usas para validar si el post existe
-      User      // Seguramente la usas para validar el autor
+      Comment,
+      Provider,
+      Post,
+      User,
+      UserBlock,
     ])
   ],
   controllers: [CommentsController],
