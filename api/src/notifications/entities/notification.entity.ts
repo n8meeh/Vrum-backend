@@ -8,7 +8,6 @@ export type NotificationType =
     | 'order_update'
     | 'chat_message'
     | 'post_solved'
-    | 'business_invite'
     | 'group_join_request'
     | 'group_request_update'
     | 'system';
@@ -27,7 +26,7 @@ export class Notification {
 
     @Column({
         type: 'enum',
-        enum: ['social_like', 'social_comment', 'social_follow', 'order_update', 'chat_message', 'post_solved', 'business_invite', 'group_join_request', 'group_request_update', 'system'],
+        enum: ['social_like', 'social_comment', 'social_follow', 'order_update', 'chat_message', 'post_solved', 'group_join_request', 'group_request_update', 'system'],
         default: 'system',
     })
     type: NotificationType;

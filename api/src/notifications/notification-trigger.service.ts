@@ -226,41 +226,6 @@ export class NotificationTriggerService {
     }
   }
 
-  /** Notificar cuando se envía una invitación de negocio */
-  async onBusinessInvite(
-    inviterId: number,
-    inviteeEmail: string,
-    providerName: string,
-  ): Promise<void> {
-    const invitee = await this.usersRepo.findOne({
-      where: { email: inviteeEmail },
-    });
-    if (!invitee) return; // El usuario invitado aún no tiene cuenta
-
-    const inviter = await this.usersRepo.findOne({ where: { id: inviterId } });
-    if (!inviter) return;
-
-    const title = 'Invitación de equipo';
-    const body = `${inviter.fullName || 'Alguien'} te invitó a unirte a ${providerName}`;
-
-    await this.notificationsService.createInApp(
-      invitee.id,
-      title,
-      body,
-      'business_invite',
-      inviterId,
-    );
-    this.gateway.emitNewNotification(invitee.id);
-
-    if (invitee.fcmToken) {
-      await this.notificationsService.sendPushNotification(
-        invitee.fcmToken,
-        title,
-        body,
-        { type: 'business_invite', relatedId: String(inviterId) },
-      );
-    }
-  }
 
   /** Notify group creator/admins when someone requests to join a private group */
   async onGroupJoinRequest(

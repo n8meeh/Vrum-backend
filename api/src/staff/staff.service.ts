@@ -112,11 +112,6 @@ export class StaffService {
 
     const saved = await this.invitationsRepo.save(invitation);
 
-    // Disparar notificación de invitación de negocio
-    this.notificationTrigger
-      .onBusinessInvite(userId, email, provider.businessName)
-      .catch(() => {});
-
     // TODO: Enviar email real con el token/link de invitación
     console.log(`=========================================`);
     console.log(`📧 INVITACIÓN DE STAFF`);
