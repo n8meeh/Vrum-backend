@@ -247,6 +247,7 @@ export class GroupsService {
       imageUrl: m.group.imageUrl,
       isPublic: m.group.isPublic,
       membersCount: counts[i],
+      postsCount: m.group.postsCount,
       myRole: m.role,
       creator: m.group.creator
         ? {

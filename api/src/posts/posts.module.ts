@@ -15,6 +15,7 @@ import { UserBlock } from '../users/entities/user-block.entity';
 import { Provider } from '../providers/entities/provider.entity';
 import { User } from '../users/entities/user.entity';
 import { GroupMember } from '../groups/entities/group-member.entity';
+import { Group } from '../groups/entities/group.entity';
 import { FilesModule } from '../files/files.module';
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { FilesModule } from '../files/files.module';
       Provider,
       User,
       GroupMember,
+      Group,
     ])
   ],
   controllers: [PostsController],

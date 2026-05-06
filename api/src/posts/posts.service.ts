@@ -12,6 +12,7 @@ import { UserBlock } from '../users/entities/user-block.entity';
 import { UserFollow } from '../users/entities/user-follow.entity';
 import { User } from '../users/entities/user.entity'; // Asegúrate que la ruta sea correcta
 import { FirebaseService } from '../files/firebase.service';
+import { Group } from '../groups/entities/group.entity';
 import { CreatePostDto } from './dto/create-post.dto';
 import { GetFeedDto } from './dto/get-feed.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
@@ -37,6 +38,7 @@ export class PostsService {
     private providersRepository: Repository<Provider>,
     @InjectRepository(User) private usersRepo: Repository<User>,
     @InjectRepository(GroupMember) private groupMembersRepo: Repository<GroupMember>,
+    @InjectRepository(Group) private groupsRepo: Repository<Group>,
     private notificationTrigger: NotificationTriggerService,
     private readonly firebaseService: FirebaseService,
   ) {}
@@ -206,6 +208,11 @@ export class PostsService {
 
     post.status = 'hidden';
     await this.postsRepository.save(post);
+
+    // Decrementar contador de posts del grupo
+    if (post.groupId) {
+      await this.groupsRepo.decrement({ id: post.groupId, postsCount: MoreThan(0) }, 'postsCount', 1);
+    }
 
     return { message: 'Post eliminado correctamente' };
   }
@@ -401,7 +408,14 @@ export class PostsService {
       tags: postTags,
     });
 
-    return await this.postsRepository.save(newPost);
+    const saved = await this.postsRepository.save(newPost);
+
+    // Incrementar contador de posts del grupo
+    if (saved.groupId) {
+      await this.groupsRepo.increment({ id: saved.groupId }, 'postsCount', 1);
+    }
+
+    return saved;
   }
 
   private extractHashtags(text: string): string[] {
