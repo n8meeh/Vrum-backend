@@ -57,6 +57,9 @@ export class ProviderProduct {
     @Column({ name: 'is_active', default: true })
     isActive: boolean;
 
+    @Column({ name: 'is_visible', default: true })
+    isVisible: boolean;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

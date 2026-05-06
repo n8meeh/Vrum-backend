@@ -39,7 +39,7 @@ export class ProductsService {
     async getProductsByProvider(providerId: number): Promise<ProviderProduct[]> {
         const provider = await this.providersRepo.findOne({ where: { id: providerId } });
         const products = await this.productsRepo.find({
-            where: { providerId, isActive: true },
+            where: { providerId, isActive: true, isVisible: true },
             relations: ['category', 'vehicleType'],
             order: { createdAt: 'DESC' },
         });
@@ -147,6 +147,7 @@ export class ProductsService {
             .innerJoin('p.provider', 'prov')
             .addSelect(['prov.id', 'prov.businessName', 'prov.logoUrl', 'prov.lat', 'prov.lng', 'prov.address', 'prov.isPremium'])
             .where('p.is_active = :active', { active: true })
+            .andWhere('p.is_visible = :pVisible', { pVisible: true })
             .andWhere('prov.is_visible = :visible', { visible: true });
 
         if (params.query) {
