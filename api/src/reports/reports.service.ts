@@ -256,10 +256,13 @@ export class ReportsService {
             const bannedUntilStr = bannedUntil.toLocaleDateString('es-ES', {
                 day: '2-digit', month: 'long', year: 'numeric',
             });
+            const isProviderBan = report.contentType === 'provider';
             await this.notificationsService.createInApp(
                 report.reportedUserId,
-                '🚫 Tu negocio ha sido suspendido',
-                `Tu negocio ha sido suspendido debido a una infracción confirmada. La suspensión estará vigente hasta el ${bannedUntilStr}.`,
+                isProviderBan ? '🚫 Tu negocio ha sido suspendido' : '🚫 Tu cuenta ha sido suspendida',
+                isProviderBan
+                    ? `Tu negocio ha sido suspendido debido a una infracción confirmada. La suspensión estará vigente hasta el ${bannedUntilStr}.`
+                    : `Tu cuenta ha sido suspendida debido a una infracción confirmada. La suspensión estará vigente hasta el ${bannedUntilStr}.`,
             );
         } else if (action === 'dismiss') {
             // Si se desestima y el provider estaba en investigación, restaurar a verificado
