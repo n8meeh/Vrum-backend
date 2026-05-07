@@ -9,6 +9,7 @@ import { MoreThan, Repository } from 'typeorm';
 import { NotificationTriggerService } from '../notifications/notification-trigger.service';
 import { Post } from '../posts/entities/post.entity';
 import { User } from '../users/entities/user.entity';
+import { UserBlock } from '../users/entities/user-block.entity';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import { GroupMember } from './entities/group-member.entity';
@@ -24,6 +25,7 @@ export class GroupsService {
     @InjectRepository(GroupMember) private membersRepo: Repository<GroupMember>,
     @InjectRepository(Post) private postsRepo: Repository<Post>,
     @InjectRepository(User) private usersRepo: Repository<User>,
+    @InjectRepository(UserBlock) private blockRepo: Repository<UserBlock>,
     private notificationTrigger: NotificationTriggerService,
   ) {}
 
@@ -84,6 +86,17 @@ export class GroupsService {
       myMembership = group.members.find((m) => m.userId === requesterId);
     }
 
+    // IDs de usuarios bloqueados/bloqueadores del solicitante
+    const blockedUserIds = new Set<number>();
+    if (requesterId) {
+      const blocks = await this.blockRepo.find({
+        where: [{ blockerId: requesterId }, { blockedId: requesterId }],
+      });
+      blocks.forEach((b) => {
+        blockedUserIds.add(b.blockerId === requesterId ? b.blockedId : b.blockerId);
+      });
+    }
+
     return {
       ...group,
       creator: group.creator
@@ -101,7 +114,7 @@ export class GroupsService {
         (m) => m.status === 'active' && m.user != null,
       ).length,
       members: group.members
-        .filter((m) => m.status === 'active' && m.user != null)
+        .filter((m) => m.status === 'active' && m.user != null && !blockedUserIds.has(m.userId))
         .map((m) => ({
           id: m.id,
           userId: m.userId,
@@ -114,7 +127,7 @@ export class GroupsService {
           },
         })),
       pendingMembers: group.members
-        .filter((m) => m.status === 'pending' && m.user != null)
+        .filter((m) => m.status === 'pending' && m.user != null && !blockedUserIds.has(m.userId))
         .map((m) => ({
           id: m.id,
           userId: m.userId,
@@ -316,13 +329,21 @@ export class GroupsService {
       order: { membersCount: 'DESC' },
     });
 
-    // Si hay usuario, verificar si ya es miembro
+    // Si hay usuario, verificar si ya es miembro y obtener IDs bloqueados
     let myMemberships = new Map<number, string>();
+    const blockedCreatorIds = new Set<number>();
     if (userId) {
       const memberships = await this.membersRepo.find({
         where: { userId },
       });
       memberships.forEach((m) => myMemberships.set(m.groupId, m.status));
+
+      const blocks = await this.blockRepo.find({
+        where: [{ blockerId: userId }, { blockedId: userId }],
+      });
+      blocks.forEach((b) => {
+        blockedCreatorIds.add(b.blockerId === userId ? b.blockedId : b.blockerId);
+      });
     }
 
     const counts = await Promise.all(
@@ -343,6 +364,8 @@ export class GroupsService {
 
     return groups
       .filter((_, i) => counts[i] > 0)
+      // Excluir grupos privados cuyo creador tiene relación de bloqueo con el usuario
+      .filter((g) => !(userId && !g.isPublic && blockedCreatorIds.has(g.creatorId)))
       .map((g) => ({
         ...g,
         membersCount: countMap.get(g.id) ?? 0,
@@ -612,11 +635,26 @@ export class GroupsService {
         'Debes ser miembro del grupo para ver las publicaciones',
       );
 
-    return this.postsRepo.find({
-      where: { groupId, status: 'active' },
-      relations: ['author', 'vehicle', 'tags', 'provider'],
-      order: { createdAt: 'DESC' },
-    });
+    return this.postsRepo
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('post.vehicle', 'vehicle')
+      .leftJoinAndSelect('post.tags', 'tags')
+      .leftJoinAndSelect('post.provider', 'provider')
+      .where('post.groupId = :groupId AND post.status = :status', {
+        groupId,
+        status: 'active',
+      })
+      .andWhere(
+        `post.authorId NOT IN (
+          SELECT ub.blocked_id FROM user_blocks ub WHERE ub.blocker_id = :me
+          UNION
+          SELECT ub.blocker_id FROM user_blocks ub WHERE ub.blocked_id = :me
+        )`,
+        { me: userId },
+      )
+      .orderBy('post.createdAt', 'DESC')
+      .getMany();
   }
 
   // ==================== HELPERS ====================
