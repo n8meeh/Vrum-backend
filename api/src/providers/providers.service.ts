@@ -167,6 +167,11 @@ export class ProvidersService {
       provider.isVisible = false;
     }
 
+    // Caso C: Si el proveedor está baneado (isVerified=3), siempre forzar isVisible a false
+    if (Number(provider.isVerified) === 3) {
+      provider.isVisible = false;
+    }
+
     const savedProvider = await this.providersRepository.save(provider);
 
     // Cascade-delete: remove old branding images from Storage if they were replaced.

@@ -181,8 +181,8 @@ export class AdminService {
         const provider = await this.providersRepo.findOne({ where: { id: providerId } });
         if (!provider) throw new NotFoundException('Proveedor no encontrado');
 
-        provider.isVerified = isVerified;
-        provider.isVisible = isVerified !== 3;
+        provider.isVerified = Number(isVerified);
+        provider.isVisible = Number(isVerified) !== 3;
         await this.providersRepo.save(provider);
 
         this.logger.log(`Proveedor ${providerId} actualizado a isVerified=${isVerified} por admin`);
