@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, OneToMany, ManyToMany, JoinTable, DeleteDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, OneToMany, ManyToMany, JoinTable, DeleteDateColumn, BeforeUpdate, BeforeInsert } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { ProviderService } from './provider-service.entity';
 import { ProviderProduct } from '../../products/entities/provider-product.entity';
@@ -130,5 +130,13 @@ export class Provider {
     deletedAt: Date | null;
 
     // ... relaciones
+
+    @BeforeInsert()
+    @BeforeUpdate()
+    enforceBannedVisibility() {
+        if (this.isVerified === 3) {
+            this.isVisible = false;
+        }
+    }
 
 }
