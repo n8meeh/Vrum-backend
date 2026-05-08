@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { AdminService } from './admin.service';
 import { ApplyStrikeDto } from './dto/apply-strike.dto';
@@ -73,5 +73,14 @@ export class AdminController {
         @Request() req,
     ) {
         return this.subscriptionsService.resolveFraudAlert(id, action, req.user.userId);
+    }
+
+    /**
+     * DELETE /admin/posts/:id
+     * Elimina (oculta) un post desde el panel de administración.
+     */
+    @Delete('posts/:id')
+    deletePost(@Param('id', ParseIntPipe) id: number) {
+        return this.adminService.adminDeletePost(id);
     }
 }

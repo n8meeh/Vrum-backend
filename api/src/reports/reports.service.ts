@@ -12,6 +12,7 @@ import { User } from '../users/entities/user.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Negotiation } from '../negotiations/entities/negotiation.entity';
 import { Review } from '../reviews/entities/review.entity';
+import { Group } from '../groups/entities/group.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -25,6 +26,7 @@ export class ReportsService {
         @InjectRepository(Order) private orderRepo: Repository<Order>,
         @InjectRepository(Negotiation) private negotiationRepo: Repository<Negotiation>,
         @InjectRepository(Review) private reviewRepo: Repository<Review>,
+        @InjectRepository(Group) private groupRepo: Repository<Group>,
         private notificationsService: NotificationsService,
     ) { }
 
@@ -68,6 +70,12 @@ export class ReportsService {
 
                 case 'user':
                     reportedUserId = dto.contentId;
+                    break;
+
+                case 'group':
+                    const group = await this.groupRepo.findOne({ where: { id: dto.contentId } });
+                    if (!group) throw new NotFoundException('Grupo no encontrado');
+                    reportedUserId = group.creatorId;
                     break;
 
                 default:

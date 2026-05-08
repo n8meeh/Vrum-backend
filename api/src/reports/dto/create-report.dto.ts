@@ -5,7 +5,7 @@ export class CreateReportDto {
     @IsOptional()
     reportedUserId?: number; // A quién reportamos (se calcula automáticamente según contentType)
 
-    @IsEnum(['post', 'comment', 'provider', 'user'])
+    @IsEnum(['post', 'comment', 'provider', 'user', 'group'])
     contentType: string;
 
     @IsNumber()

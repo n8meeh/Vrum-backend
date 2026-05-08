@@ -216,4 +216,20 @@ export class AdminService {
             isVisible: user.isVisible,
         };
     }
+
+    /**
+     * Elimina (oculta) un post desde el panel de administración,
+     * sin verificar propiedad del autor.
+     */
+    async adminDeletePost(postId: number) {
+        const post = await this.postsRepo.findOne({ where: { id: postId } });
+        if (!post) throw new NotFoundException('Publicación no encontrada');
+
+        post.status = 'hidden';
+        await this.postsRepo.save(post);
+
+        this.logger.warn(`Admin eliminó el post ${postId}`);
+
+        return { message: 'Publicación eliminada correctamente' };
+    }
 }

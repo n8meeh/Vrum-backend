@@ -12,7 +12,7 @@ export class ContentReport {
     @Column({ name: 'reported_user_id' })
     reportedUserId: number;
 
-    @Column({ name: 'content_type', type: 'enum', enum: ['post', 'comment', 'review', 'user', 'provider', 'appeal'] })
+    @Column({ name: 'content_type', type: 'enum', enum: ['post', 'comment', 'review', 'user', 'provider', 'group', 'appeal'] })
     contentType: string;
 
     @Column({ name: 'content_id' })
