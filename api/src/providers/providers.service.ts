@@ -427,6 +427,23 @@ export class ProvidersService {
       }
     }
 
+    // Añadir equipo: dueño + staff vinculado
+    if (provider) {
+      const staffMembers = await this.usersRepo.find({
+        where: { providerId: provider.id },
+        select: ['id', 'fullName', 'avatarUrl', 'role'],
+      });
+
+      const owner = provider.user
+        ? { id: provider.user.id, fullName: provider.user.fullName, avatarUrl: provider.user.avatarUrl, role: 'provider' }
+        : null;
+
+      (provider as any).team = [
+        ...(owner ? [owner] : []),
+        ...staffMembers.map((s) => ({ id: s.id, fullName: s.fullName, avatarUrl: s.avatarUrl, role: s.role })),
+      ];
+    }
+
     return provider;
   }
 
