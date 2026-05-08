@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { Provider } from '../providers/entities/provider.entity';
 import { Post } from '../posts/entities/post.entity';
+import { Group } from '../groups/entities/group.entity';
 
 @Injectable()
 export class AdminService {
@@ -13,6 +14,7 @@ export class AdminService {
         @InjectRepository(User) private usersRepo: Repository<User>,
         @InjectRepository(Provider) private providersRepo: Repository<Provider>,
         @InjectRepository(Post) private postsRepo: Repository<Post>,
+        @InjectRepository(Group) private groupsRepo: Repository<Group>,
     ) {}
 
     /**
@@ -231,5 +233,20 @@ export class AdminService {
         this.logger.warn(`Admin eliminó el post ${postId}`);
 
         return { message: 'Publicación eliminada correctamente' };
+    }
+
+    /**
+     * Desactiva un grupo desde el panel de administración.
+     */
+    async adminDeleteGroup(groupId: number) {
+        const group = await this.groupsRepo.findOne({ where: { id: groupId } });
+        if (!group) throw new NotFoundException('Grupo no encontrado');
+
+        group.isActive = false;
+        await this.groupsRepo.save(group);
+
+        this.logger.warn(`Admin desactivó el grupo ${groupId}`);
+
+        return { message: 'Grupo eliminado correctamente' };
     }
 }

@@ -83,4 +83,13 @@ export class AdminController {
     deletePost(@Param('id', ParseIntPipe) id: number) {
         return this.adminService.adminDeletePost(id);
     }
+
+    /**
+     * DELETE /admin/groups/:id
+     * Desactiva un grupo desde el panel de administración.
+     */
+    @Delete('groups/:id')
+    deleteGroup(@Param('id', ParseIntPipe) id: number) {
+        return this.adminService.adminDeleteGroup(id);
+    }
 }

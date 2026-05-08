@@ -5,11 +5,12 @@ import { AdminService } from './admin.service';
 import { User } from '../users/entities/user.entity';
 import { Provider } from '../providers/entities/provider.entity';
 import { Post } from '../posts/entities/post.entity';
+import { Group } from '../groups/entities/group.entity';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([User, Provider, Post]),
+        TypeOrmModule.forFeature([User, Provider, Post, Group]),
         SubscriptionsModule,
     ],
     controllers: [AdminController],
