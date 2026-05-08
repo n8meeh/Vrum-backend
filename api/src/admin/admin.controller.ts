@@ -61,6 +61,16 @@ export class AdminController {
     }
 
     /**
+     * POST /admin/run-expire-subscriptions
+     * Dispara manualmente el job de expiración de suscripciones Premium/Trial.
+     */
+    @Post('run-expire-subscriptions')
+    async runExpireSubscriptions() {
+        const count = await this.subscriptionsService.expireSubscriptions();
+        return { message: `Job ejecutado. Suscripciones expiradas: ${count}` };
+    }
+
+    /**
      * PATCH /admin/providers/:id
      * Actualiza el estado de verificación de un proveedor.
      * Body: { isVerified: 0 | 1 | 2 | 3 }
