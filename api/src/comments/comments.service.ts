@@ -150,6 +150,7 @@ export class CommentsService {
         const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
         const proCommentsCount = await this.commentsRepository.count({
+          withDeleted: true,
           where: {
             authorId: userId,
             isProfessional: true,
@@ -286,8 +287,7 @@ export class CommentsService {
     const postId = comment.postId;
     const wasSolution = comment.isSolution;
 
-    // Aquí suele ser mejor borrado físico, o cambiar texto a "[Eliminado]"
-    await this.commentsRepository.remove(comment);
+    await this.commentsRepository.softDelete(commentId);
 
     // Si el comentario eliminado era la solución, desmarcar el post como resuelto
     if (wasSolution) {

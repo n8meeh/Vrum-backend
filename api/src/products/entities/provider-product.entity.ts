@@ -6,6 +6,7 @@ import {
     JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
+    DeleteDateColumn,
 } from 'typeorm';
 import { Provider } from '../../providers/entities/provider.entity';
 import { VehicleType } from '../../vehicles/entities/vehicle-type.entity';
@@ -65,6 +66,9 @@ export class ProviderProduct {
 
     @UpdateDateColumn({ name: 'updated_at' })
     updatedAt: Date;
+
+    @DeleteDateColumn({ name: 'deleted_at', nullable: true })
+    deletedAt: Date | null;
 
     // ── Relaciones ──
     @ManyToOne(() => Provider, (provider) => provider.products)

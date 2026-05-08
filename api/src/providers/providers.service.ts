@@ -580,6 +580,7 @@ export class ProvidersService {
     // Límite de 7 servicios para proveedores no-premium
     if (!provider.isPremium) {
       const servicesCount = await this.providerServicesRepo.count({
+        withDeleted: true,
         where: { providerId: provider.id },
       });
       if (servicesCount >= 7) {
@@ -623,7 +624,7 @@ export class ProvidersService {
     });
     if (!service) throw new NotFoundException('El servicio que intentas modificar no existe');
 
-    await this.providerServicesRepo.remove(service);
+    await this.providerServicesRepo.softDelete(serviceId);
     return { message: 'Servicio eliminado' };
   }
 

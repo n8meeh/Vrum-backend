@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, DeleteDateColumn } from 'typeorm';
 import { Provider } from './provider.entity';
 // Asegúrate de que esta ruta apunte a donde tienes VehicleType
 import { VehicleType } from '../../vehicles/entities/vehicle-type.entity';
@@ -25,6 +25,12 @@ export class ProviderService {
 
     @Column({ name: 'is_active', default: true })
     isActive: boolean;
+
+    @CreateDateColumn({ name: 'created_at' })
+    createdAt: Date;
+
+    @DeleteDateColumn({ name: 'deleted_at', nullable: true })
+    deletedAt: Date | null;
 
     @ManyToOne(() => Provider, (provider) => provider.services)
     @JoinColumn({ name: 'provider_id' })

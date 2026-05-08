@@ -66,7 +66,7 @@ export class ProductsService {
         // Límite de productos para no-premium
         const provider = await this.providersRepo.findOne({ where: { id: providerId } });
         if (provider && !provider.isPremium) {
-            const count = await this.productsRepo.count({ where: { providerId } });
+            const count = await this.productsRepo.count({ withDeleted: true, where: { providerId } });
             if (count >= this.MAX_PRODUCTS_FREE) {
                 throw new BadRequestException(
                     `Has alcanzado tu límite de ${this.MAX_PRODUCTS_FREE} productos. ¡Pásate a Premium para agregar productos sin límites!`,
@@ -125,7 +125,7 @@ export class ProductsService {
             throw new ForbiddenException('No puedes eliminar este producto.');
         }
 
-        await this.productsRepo.remove(product);
+        await this.productsRepo.softDelete(productId);
         this.logger.log(`Producto eliminado: ${product.name} (id: ${productId})`);
     }
 
