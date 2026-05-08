@@ -7,11 +7,13 @@ import { Provider } from '../providers/entities/provider.entity';
 import { Post } from '../posts/entities/post.entity';
 import { Group } from '../groups/entities/group.entity';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { ProvidersModule } from '../providers/providers.module';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([User, Provider, Post, Group]),
         SubscriptionsModule,
+        ProvidersModule,
     ],
     controllers: [AdminController],
     providers: [AdminService],

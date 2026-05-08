@@ -4,6 +4,7 @@ import { AdminService } from './admin.service';
 import { ApplyStrikeDto } from './dto/apply-strike.dto';
 import { UnbanUserDto } from './dto/unban-user.dto';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { ProvidersService } from '../providers/providers.service';
 
 @Controller('admin')
 @UseGuards(AdminGuard)
@@ -11,6 +12,7 @@ export class AdminController {
     constructor(
         private readonly adminService: AdminService,
         private readonly subscriptionsService: SubscriptionsService,
+        private readonly providersService: ProvidersService,
     ) {}
 
     /**
@@ -47,6 +49,15 @@ export class AdminController {
     @Get('fraud-alerts')
     getFraudAlerts() {
         return this.subscriptionsService.getFraudAlerts();
+    }
+
+    /**
+     * POST /admin/run-verification-job
+     * Dispara manualmente el job de verificación automática de proveedores.
+     */
+    @Post('run-verification-job')
+    runVerificationJob() {
+        return this.providersService.runVerificationJob();
     }
 
     /**
