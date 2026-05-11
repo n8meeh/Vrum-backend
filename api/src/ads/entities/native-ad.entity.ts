@@ -25,6 +25,12 @@ export class NativeAd {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
+  @Column({ name: 'views_count', default: 0 })
+  viewsCount: number;
+
+  @Column({ name: 'clicks_count', default: 0 })
+  clicksCount: number;
+
   @Column({ name: 'start_date', type: 'datetime', nullable: true })
   startDate: Date | null;
 

@@ -58,6 +58,14 @@ export class AdsService {
     return saved;
   }
 
+  async trackView(id: number): Promise<void> {
+    await this.adsRepository.increment({ id }, 'viewsCount', 1);
+  }
+
+  async trackClick(id: number): Promise<void> {
+    await this.adsRepository.increment({ id }, 'clicksCount', 1);
+  }
+
   async remove(id: number): Promise<void> {
     const ad = await this.adsRepository.findOne({ where: { id } });
     if (!ad) throw new NotFoundException(`Ad #${id} no encontrado`);

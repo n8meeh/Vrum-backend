@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { AdsService } from './ads.service';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { CreateAdDto } from './dto/create-ad.dto';
@@ -12,6 +12,20 @@ export class AdsController {
   @Get()
   findAll() {
     return this.adsService.findActive();
+  }
+
+  // Público: el cliente registra una impresión
+  @Post(':id/view')
+  @HttpCode(204)
+  trackView(@Param('id', ParseIntPipe) id: number) {
+    return this.adsService.trackView(id);
+  }
+
+  // Público: el cliente registra un click
+  @Post(':id/click')
+  @HttpCode(204)
+  trackClick(@Param('id', ParseIntPipe) id: number) {
+    return this.adsService.trackClick(id);
   }
 
   // ── Admin ─────────────────────────────────────────────
